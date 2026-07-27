@@ -28,7 +28,11 @@ const COMPILER_OPTIONS = {
 };
 
 /** Texto de la declaración de un símbolo exportado, sin comentarios ni cuerpo. */
-function render(checker, symbol) {
+function render(checker, exported) {
+  // Un `export { X } from './x.js'` llega como alias; lo que interesa retratar
+  // es la declaración a la que apunta, no el reexport.
+  const symbol =
+    (exported.flags & ts.SymbolFlags.Alias) === 0 ? exported : checker.getAliasedSymbol(exported);
   const declarations = symbol.getDeclarations() ?? [];
   const rendered = [];
   for (const declaration of declarations) {
@@ -40,10 +44,10 @@ function render(checker, symbol) {
       rendered.push(declaration.getText());
     } else {
       const type = checker.getTypeOfSymbolAtLocation(symbol, declaration);
-      rendered.push(`declare const ${symbol.getName()}: ${checker.typeToString(type)};`);
+      rendered.push(`declare const ${exported.getName()}: ${checker.typeToString(type)};`);
     }
   }
-  return rendered.length > 0 ? rendered.join('\n') : `declare const ${symbol.getName()}: unknown;`;
+  return rendered.length > 0 ? rendered.join('\n') : `declare const ${exported.getName()}: unknown;`;
 }
 
 function surfaceOf(context) {

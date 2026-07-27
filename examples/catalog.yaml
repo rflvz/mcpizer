@@ -1,0 +1,64 @@
+# Catálogo declarado: qué tools existen de verdad en cada upstream.
+#
+# Es lo que hace posible el invariante 8. Validar el mapeo tool→capacidad
+# requiere saber qué tools existen, y preguntárselo a los upstreams rompería la
+# propiedad de que todo se verifica en local. Este fichero es generable desde
+# los upstreams reales y se versiona junto a la política.
+#
+# Con él, la verificación en seco detecta también lo que de otro modo solo
+# aparecería en ejecución: mapeos a tools que ya no existen, y tools nuevas que
+# ningún mapeo cubre — invisibles por fallo cerrado, correctamente, pero cuya
+# aparición conviene señalar.
+
+version: 1
+
+tools:
+  - upstream: crm-principal
+    name: get_contact
+    description: Devuelve una ficha de contacto por identificador
+    inputSchema:
+      type: object
+      properties:
+        id: { type: string }
+      required: [id]
+
+  - upstream: crm-principal
+    name: search_contacts
+    description: Busca contactos por texto libre
+    inputSchema:
+      type: object
+      properties:
+        query: { type: string }
+      required: [query]
+
+  - upstream: crm-principal
+    name: upsert_contact
+    description: Crea o modifica una ficha de contacto
+    inputSchema:
+      type: object
+      properties:
+        id: { type: string }
+        fields: { type: object }
+      required: [fields]
+
+  # Existe en el upstream y la política no la mapea. No la ve nadie y no la
+  # invoca nadie: no declararla ya es denegarla. `validate` la señala como aviso,
+  # no como error, porque el fallo cerrado ya hizo lo correcto.
+  - upstream: crm-principal
+    name: delete_contact
+    description: Borra una ficha de contacto
+    inputSchema:
+      type: object
+      properties:
+        id: { type: string }
+      required: [id]
+
+  - upstream: facturacion
+    name: create_invoice
+    description: Emite una factura contra un cliente
+    inputSchema:
+      type: object
+      properties:
+        customerId: { type: string }
+        lines: { type: array }
+      required: [customerId, lines]
