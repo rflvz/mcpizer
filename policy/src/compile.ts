@@ -18,6 +18,7 @@ import {
   type CompiledIssuer,
   type CompiledPolicy,
   type CompiledToolMapping,
+  type CompiledTransport,
   type CompiledUpstream,
   type IssuerKind,
   type ToolIdentity,
@@ -48,11 +49,19 @@ interface RawPolicy {
   capabilities: { id: string; description?: string }[];
   upstreams?: {
     id: string;
-    transport: { kind: TransportKind };
+    transport: { kind: TransportKind; command?: string; args?: string[]; url?: string };
     tools: { name: string; capability: string }[];
   }[];
   accounts: { id: string; disabled?: boolean; secret: { ref: string } }[];
-  principals: { issuers: { id: string; kind: IssuerKind; attributes?: Record<string, string> }[] };
+  principals: {
+    issuers: {
+      id: string;
+      kind: IssuerKind;
+      subject?: string;
+      secret?: { ref: string };
+      attributes?: Record<string, string>;
+    }[];
+  };
   grants: {
     to: { issuer: string; attributes?: Record<string, string> };
     capabilities: string[];
@@ -108,6 +117,22 @@ function selectorsOverlap(
     if (other !== undefined && other !== value) return false;
   }
   return true;
+}
+
+/**
+ * El esquema ya garantiza que un `mcp-stdio` trae `command` y un `mcp-http` trae
+ * `url`; esto solo lo interpreta, igual que `windowMillis` con la ventana.
+ */
+function compileTransport(transport: {
+  kind: TransportKind;
+  command?: string;
+  args?: string[];
+  url?: string;
+}): CompiledTransport {
+  if (transport.kind === 'mcp-stdio') {
+    return { kind: 'mcp-stdio', command: transport.command ?? '', args: transport.args ?? [] };
+  }
+  return { kind: 'mcp-http', url: transport.url ?? '' };
 }
 
 function reportDuplicates(
@@ -178,7 +203,7 @@ export function compile(text: string, options: CompileOptions = {}): CompileResu
       return { upstream: upstream.id, name: tool.name, capability: tool.capability, path: toolPath };
     });
     mappings.push(...tools);
-    return { id: upstream.id, transport: upstream.transport.kind, tools, path: upstreamPath };
+    return { id: upstream.id, transport: compileTransport(upstream.transport), tools, path: upstreamPath };
   });
   reportDuplicates(
     diagnostics,
@@ -214,7 +239,19 @@ export function compile(text: string, options: CompileOptions = {}): CompileResu
         }
       }
     }
-    return { id: issuer.id, kind: issuer.kind, attributes, path: issuerPath };
+    // Sujeto y referencia a la clave son enganche con la periferia, no política:
+    // son opcionales por el mismo motivo por el que `discovery` lo es en un
+    // emisor `oidc` (`docs/diseno/artefacto.md` §1). Un emisor `static-key` sin
+    // ellos no puede autenticar a nadie, que es fallo cerrado, y la pasarela lo
+    // dice al arrancar; la verificación en seco no tiene nada que objetar.
+    return {
+      id: issuer.id,
+      kind: issuer.kind,
+      attributes,
+      subject: issuer.subject,
+      secretRef: issuer.secret?.ref,
+      path: issuerPath,
+    };
   });
   reportDuplicates(
     diagnostics,

@@ -22,6 +22,9 @@
   "devDependencies": {
     "@eslint/js": "^9.17.0",
     "@mcpizer/access": "workspace:*",
+    "@mcpizer/adapters": "workspace:*",
+    "@mcpizer/runtime": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@types/node": "^22.10.2",
     "dependency-cruiser": "^16.10.0",
     "eslint": "^9.17.0",

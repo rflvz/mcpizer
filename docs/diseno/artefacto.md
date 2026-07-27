@@ -103,6 +103,11 @@ principals:
     - id: ci
       kind: static-key
       # Para desarrollo y para la propia verificación en seco.
+      # Una clave estática no trae sujeto consigo como lo trae un token, así
+      # que hay que declararlo. Y la clave en sí no vive aquí: como las
+      # cuentas, solo su referencia.
+      subject: build-agent
+      secret: { ref: "env://MCPIZER_CI_KEY" }
       attributes:
         team: platform
         role: automation

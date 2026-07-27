@@ -8,9 +8,9 @@ Las dos identidades nunca son la misma cosa. **Quién invoca** es el principal: 
 
 ## Estado
 
-**Sesión 1 completada**: el núcleo y la CLI de verificación en seco. Se puede responder "¿quién puede emitir facturas?" en un portátil, sin red, sin credenciales y sin que exista ningún despliegue.
+**Sesión 2 completada**: la pasarela. Un cliente MCP real se conecta y ve solo lo concedido a su identidad; invocar una tool no listada deniega con el motivo y el sitio exacto del artefacto que hay que tocar.
 
-No hay todavía pasarela MCP. Lo que sigue está en [`docs/sesiones.md`](docs/sesiones.md) §5.
+Los siete puertos están declarados y cada uno tiene **una** implementación, la más simple: clave estática, fichero, catálogo declarado, contadores en memoria, credenciales por entorno, cliente MCP por stdio y registro JSON. La segunda implementación de cada frontera —OIDC, git, MCP sobre HTTP, Vault, Redis, OpenTelemetry— es la sesión 3, en [`docs/sesiones.md`](docs/sesiones.md) §5.
 
 ## Empezar
 
@@ -43,6 +43,23 @@ mcpizer diff antes.yaml despues.yaml
 Una denegación no dice solo que no: dice el código del motivo y el sitio exacto del artefacto que hay que tocar, como `examples/policy.yaml:90:5`. Ese es el bucle de corrección — se pregunta, se corrige, se vuelve a preguntar, sin desplegar y sin adivinar.
 
 El JSON Schema del artefacto se emite con `mcpizer schema`, para editores y validadores externos.
+
+## La pasarela
+
+Un cliente MCP se conecta a mcpizer en lugar de conectarse a los upstreams:
+
+```bash
+MCPIZER_CI_KEY=... MCPIZER_API_KEY=... \
+mcpizer serve examples/policy.yaml --catalog examples/catalog.yaml --issuer ci
+```
+
+Habla stdio por los dos lados: el cliente arranca este proceso, y este arranca los upstreams declarados. La clave llega por entorno porque stdio no tiene cabeceras — con HTTP, en la sesión 3, será una cabecera.
+
+Lo que el cliente ve en `tools/list` es **la misma decisión** que contesta `explain`, aplicada a cada capacidad. No es un filtro aparte que haya que mantener sincronizado con la autorización, así que el fallo clásico —una tool que se oculta pero sigue siendo invocable si se adivina su nombre— no puede ocurrir por construcción.
+
+Las tools se anuncian como `upstream__tool`, siempre cualificadas: así declarar un proveedor nuevo no renombra las tools de otro.
+
+Y las dos identidades siguen separadas hasta el último metro. La credencial de la cuenta se resuelve **después** de que una decisión la haya autorizado, solo esa, y no vuelve hacia dentro bajo ninguna forma: no aparece en motivos, ni en registros, ni en mensajes de error. Hay un test que lo comprueba, y un caso que lo hace fallar.
 
 ## Estructura
 
@@ -83,6 +100,7 @@ Los nueve criterios de la sección 5 de la arquitectura "se ejecutan y se respon
 | El núcleo es puro | Sin `node:*`, sin reloj, sin aleatoriedad, y sus tests sin un solo doble |
 | Blast radius | Retrato versionado de la superficie pública de cada contexto |
 | Fallo cerrado y explicabilidad | Tests de propiedad sobre artefactos generados |
+| Ninguna credencial en registros ni motivos | Centinela irrepetible, y un escáner sobre todo lo observable |
 
 Y **cada una tiene un caso que la hace fallar**, en [`verification/fixtures/violations/`](verification/fixtures/violations/). Una comprobación que nunca ha fallado no está verificada: sin ese caso, una sesión larga cree tener red y no la tiene, que es peor que no tenerla porque cambia cómo se decide.
 

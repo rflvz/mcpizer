@@ -12,19 +12,38 @@
  * un hecho más — por eso no existe un puerto `Clock`.
  */
 import { parseArgs } from 'node:util';
-import { declaredCatalogFile, policyFile } from '@mcpizer/adapters';
+import {
+  declaredCatalogFile,
+  envCredentials,
+  mcpStdioInvoker,
+  mcpStdioServer,
+  memoryUsage,
+  policyFile,
+  staticKeyPrincipals,
+  stderrRecorder,
+  type StaticKeyIssuer,
+} from '@mcpizer/adapters';
 import { hasErrors, schema } from '@mcpizer/policy';
 import type { Instant, Usage } from '@mcpizer/access';
 import {
   effectiveDiff,
   explain,
+  gateway,
   loadPolicy,
   whoCan,
   type CatalogSource,
+  type CredentialResolver,
+  type DecisionRecorder,
+  type GatewayPorts,
   type LoadedPolicy,
   type PolicySource,
+  type PrincipalResolver,
+  type ToolInvoker,
+  type TransportCredentials,
+  type UsageReader,
+  type UsageWriter,
 } from '../index.js';
-import { renderDiagnostics, renderDiff, renderExplanation, renderReach } from './render.js';
+import { renderCallOutcome, renderDiagnostics, renderDiff, renderExplanation, renderReach } from './render.js';
 
 const USAGE = `mcpizer — verificación en seco de políticas. Sin red, sin credenciales, sin despliegue.
 
@@ -46,6 +65,11 @@ const USAGE = `mcpizer — verificación en seco de políticas. Sin red, sin cre
   mcpizer schema
       El JSON Schema del artefacto, para editores y validadores externos.
 
+  mcpizer serve <politica.yaml> --catalog <catalogo.yaml> --issuer <id> [--key-env <VAR>]
+      La pasarela MCP por stdio. Un cliente ve solo lo concedido a la identidad
+      con la que se conecta, e invocar una tool no listada deniega con motivo.
+      La clave se presenta por entorno, porque stdio no tiene cabeceras.
+
 Códigos de salida: 0 sin hallazgos · 1 hallazgos · 2 uso incorrecto · 3 origen inalcanzable.`;
 
 const OPTIONS = {
@@ -57,8 +81,12 @@ const OPTIONS = {
   capability: { type: 'string' },
   at: { type: 'string' },
   usage: { type: 'string' },
+  'key-env': { type: 'string' },
   help: { type: 'boolean', short: 'h', default: false },
 } as const;
+
+/** De dónde lee la pasarela la clave que el cliente presenta, si nadie dice otra cosa. */
+const DEFAULT_KEY_ENV = 'MCPIZER_API_KEY';
 
 class UsageError extends Error {}
 
@@ -107,6 +135,94 @@ async function load(path: string, catalogPath: string | undefined): Promise<Load
   const catalog: CatalogSource | undefined =
     catalogPath === undefined ? undefined : declaredCatalogFile(catalogPath);
   return loadPolicy(source, catalog);
+}
+
+/**
+ * La pasarela.
+ *
+ * Es el único sitio donde se comprueba que los adaptadores cumplen los
+ * contratos: `adapters/` no puede importar `runtime/` —sería un ciclo entre
+ * paquetes—, así que la conformidad se verifica aquí, al asignar cada uno a una
+ * variable del tipo de su puerto. El tipado estructural hace que eso sea una
+ * comprobación real y no un gesto.
+ */
+async function serve(artifactPath: string, values: { catalog?: string; issuer?: string; 'key-env'?: string }): Promise<number> {
+  const catalogPath = required(values.catalog, '--catalog');
+  const issuerId = required(values.issuer, '--issuer');
+  const keyEnv = values['key-env'] ?? DEFAULT_KEY_ENV;
+
+  const loaded = await load(artifactPath, catalogPath);
+  if (loaded.policy === undefined) {
+    print([
+      'La política no compila; no hay pasarela que levantar.',
+      '',
+      ...renderDiagnostics(loaded.artifact.origin, loaded.diagnostics),
+    ]);
+    return 1;
+  }
+
+  // Solo los emisores que declaran sujeto y clave pueden autenticar a alguien.
+  // Los demás no son un error de autoría —el enganche con la periferia es
+  // opcional— pero tampoco sirven aquí, y decirlo al arrancar es mejor que
+  // dejar que el primer cliente se estrelle contra `issuer_unknown`.
+  const usable: StaticKeyIssuer[] = loaded.policy.issuers.flatMap((issuer) =>
+    issuer.kind === 'static-key' && issuer.subject !== undefined && issuer.secretRef !== undefined
+      ? [{ id: issuer.id, subject: issuer.subject, secretRef: issuer.secretRef, attributes: issuer.attributes }]
+      : [],
+  );
+  if (!usable.some((issuer) => issuer.id === issuerId)) {
+    throw new UsageError(
+      `\`--issuer ${issuerId}\` no es un emisor \`static-key\` con \`subject\` y \`secret\` declarados. ` +
+        `Los que sí lo son: ${usable.length === 0 ? 'ninguno' : usable.map((issuer) => issuer.id).join(', ')}.`,
+    );
+  }
+
+  const invoker: ToolInvoker = mcpStdioInvoker();
+  const usage = memoryUsage();
+  const ports: GatewayPorts = {
+    principals: staticKeyPrincipals(usable) satisfies PrincipalResolver,
+    usageReader: usage satisfies UsageReader,
+    usageWriter: usage satisfies UsageWriter,
+    credentials: envCredentials() satisfies CredentialResolver,
+    invoker,
+    recorder: stderrRecorder() satisfies DecisionRecorder,
+    // El reloj vive aquí, en la cáscara. El instante entra en la decisión como
+    // un hecho más, que es la razón de que no exista un puerto `Clock`.
+    now: () => Date.now(),
+  };
+
+  const door = gateway(loaded, ports);
+
+  /**
+   * stdio no tiene cabeceras: el canal por el que llega la credencial es el
+   * entorno del proceso que el cliente arranca. Se lee en cada petición y no se
+   * guarda en ninguna parte.
+   */
+  const credentials = (): TransportCredentials => ({
+    issuer: issuerId,
+    presented: process.env[keyEnv] ?? '',
+  });
+
+  const running = await mcpStdioServer({ name: 'mcpizer', version: '0.0.0' }, {
+    async listTools() {
+      const outcome = await door.list(credentials());
+      // Sin identidad no se anuncia nada. Lo no concedido no se marca como
+      // prohibido: no sale (invariante 3).
+      return outcome.kind === 'listed' ? outcome.tools : [];
+    },
+    async callTool(name, args) {
+      const outcome = await door.call(credentials(), name, args);
+      if (outcome.kind === 'invoked') return outcome.result;
+      return {
+        content: [{ type: 'text', text: renderCallOutcome(loaded.artifact.origin, outcome) }],
+        isError: true,
+      };
+    },
+  });
+
+  await running.closed;
+  await invoker.close();
+  return 0;
 }
 
 function print(lines: readonly string[]): void {
@@ -188,6 +304,8 @@ async function run(argv: readonly string[]): Promise<number> {
     else print(renderDiff(changes));
     return changes.length === 0 ? 0 : 1;
   }
+
+  if (command === 'serve') return serve(artifactPath, values);
 
   throw new UsageError(`\`${command}\` no es un comando. Prueba \`mcpizer help\`.`);
 }
