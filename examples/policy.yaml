@@ -1,0 +1,118 @@
+version: 1
+
+# ─────────────────────────────────────────────────────────────
+# 1. CAPACIDADES — el vocabulario estable.
+#    Es lo único que las concesiones pueden nombrar. Los nombres
+#    de tool no aparecen en ninguna concesión, nunca: por eso
+#    renombrar una tool upstream no rompe esta configuración.
+# ─────────────────────────────────────────────────────────────
+capabilities:
+  - id: crm.contact.read
+    description: Consultar fichas de contacto
+  - id: crm.contact.write
+    description: Crear o modificar fichas de contacto
+  - id: billing.invoice.issue
+    description: Emitir facturas contra un cliente
+
+# ─────────────────────────────────────────────────────────────
+# 2. UPSTREAMS — de dónde salen las tools y qué capacidad realiza
+#    cada una. Este es el único punto que conoce nombres reales;
+#    absorbe los renombrados y aísla al resto del fichero.
+# ─────────────────────────────────────────────────────────────
+upstreams:
+  - id: crm-principal
+    transport:
+      kind: mcp-stdio
+      command: crm-mcp-server
+    tools:
+      # Muchas tools → una capacidad. Es el caso normal.
+      - name: get_contact
+        capability: crm.contact.read
+      - name: search_contacts
+        capability: crm.contact.read
+      - name: upsert_contact
+        capability: crm.contact.write
+      # `delete_contact` existe en el upstream y NO está aquí.
+      # Por tanto no la ve nadie y no la invoca nadie. No hace
+      # falta prohibirla: no declararla ya es denegarla.
+
+  - id: facturacion
+    transport:
+      kind: mcp-http
+      url: https://billing.internal/mcp
+    tools:
+      - name: create_invoice
+        capability: billing.invoice.issue
+
+# ─────────────────────────────────────────────────────────────
+# 3. CUENTAS — la segunda identidad. Solo referencias.
+#    Ninguna clave, ningún token, nada canjeable en este fichero:
+#    por eso puede vivir en git y revisarse por PR.
+# ─────────────────────────────────────────────────────────────
+accounts:
+  - id: crm-solo-lectura
+    secret: { ref: "vault://kv/mcpizer/crm-ro" }
+  - id: crm-operaciones
+    secret: { ref: "vault://kv/mcpizer/crm-rw" }
+  - id: facturacion-ops
+    secret: { ref: "env://BILLING_OPS_KEY" }
+
+# ─────────────────────────────────────────────────────────────
+# 4. PRINCIPALES — cómo se reconoce a quien invoca y sobre qué
+#    atributos puede discriminar la política.
+# ─────────────────────────────────────────────────────────────
+principals:
+  issuers:
+    - id: corp
+      kind: oidc
+      discovery: https://id.internal/.well-known/openid-configuration
+      audience: mcpizer
+      # Solo estos claims se convierten en atributos. Lo demás
+      # del token se descarta: la política no puede discriminar
+      # sobre algo que no esté declarado aquí.
+      attributes:
+        team: claim:groups
+        role: claim:role
+
+    - id: ci
+      kind: static-key
+      # Para desarrollo y para la propia verificación en seco.
+      attributes:
+        team: platform
+        role: automation
+
+# ─────────────────────────────────────────────────────────────
+# 5. CONCESIONES — quién obtiene qué, con qué cuenta y con qué
+#    techo. Solo hay concesiones: no existen reglas de denegación.
+#    Ver §3.
+# ─────────────────────────────────────────────────────────────
+grants:
+  - to:
+      issuer: corp
+      attributes: { team: ventas }
+    capabilities: [crm.contact.read]
+    using: crm-solo-lectura
+    limits:
+      calls: 500
+      per: 1h
+
+  - to:
+      issuer: corp
+      attributes: { team: ventas, role: manager }
+    capabilities: [crm.contact.write]
+    using: crm-operaciones
+    limits:
+      calls: 50
+      per: 1h
+
+  # Un agente automatizado. Nótese que quién invoca (el agente de
+  # CI) y con qué credencial se actúa (la cuenta de facturación)
+  # son dos cosas distintas y visiblemente separadas.
+  - to:
+      issuer: ci
+      attributes: { role: automation }
+    capabilities: [billing.invoice.issue]
+    using: facturacion-ops
+    limits:
+      calls: 20
+      per: 24h

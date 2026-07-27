@@ -1,0 +1,26 @@
+name: verify
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # Los nueve criterios de `docs/arquitectura.md` §5, en un solo comando que
+      # pasa o falla. La sección 5 dice que se ejecutan y se responden, no se
+      # opinan; esto es lo que lo hace literal.
+      - run: pnpm verify

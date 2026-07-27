@@ -1,0 +1,1 @@
+{ "name": "@mcpizer/access", "private": true, "type": "module", "main": "./dist/index.js" }
