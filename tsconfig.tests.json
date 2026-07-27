@@ -15,6 +15,7 @@
     "*/test/**/*.ts",
     "verification/**/*.ts",
     "verification/**/*.js",
+    "deployment/**/*.js",
     "*.ts",
     ".dependency-cruiser.js",
     "eslint.config.js"

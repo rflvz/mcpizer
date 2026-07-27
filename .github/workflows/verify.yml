@@ -20,7 +20,52 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      # Los nueve criterios de `docs/arquitectura.md` §5, en un solo comando que
-      # pasa o falla. La sección 5 dice que se ejecutan y se responden, no se
-      # opinan; esto es lo que lo hace literal.
+      # Los nueve criterios de `docs/arquitectura.md` §5 y los criterios de
+      # terminación de las cuatro sesiones, en un solo comando que pasa o falla.
+      # La sección 5 dice que se ejecutan y se responden, no se opinan; esto es
+      # lo que lo hace literal.
+      #
+      # Incluye construir el artefacto desplegable y arrancarlo desde cero
+      # (`docs/sesiones.md` §5, S4): sin Docker, sin red y sin servicios.
       - run: pnpm verify
+
+  # La imagen es lo único de S4 que no cabe dentro de `pnpm verify`, porque
+  # necesita un demonio de contenedores. Va en un trabajo aparte a propósito: el
+  # criterio de terminación no depende de ella (decisión 0032), y a la vez un
+  # Dockerfile que nadie construye es documentación que se pudre en silencio.
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - run: docker build -f deployment/Dockerfile -t mcpizer:ci .
+
+      - name: dice qué build lleva
+        run: docker run --rm mcpizer:ci version
+
+      - name: arranca contra la política de ejemplo, y la sonda contesta
+        run: |
+          set -euo pipefail
+          docker run -d --name mcpizer-ci -p 8080:8080 \
+            -v "$PWD/examples:/politica:ro" \
+            mcpizer:ci serve /politica/policy.yaml --catalog /politica/catalog.yaml \
+            --issuer ci --http --host 0.0.0.0 --port 8080
+
+          for _ in $(seq 1 30); do
+            curl -fsS http://127.0.0.1:8080/health >/dev/null 2>&1 && break
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:8080/health | tee /dev/stderr | grep -q '"status":"ok"'
+
+      - name: y para ordenadamente cuando se le manda parar
+        run: |
+          set -euo pipefail
+          docker stop --timeout 20 mcpizer-ci
+          salida="$(docker inspect -f '{{.State.ExitCode}}' mcpizer-ci)"
+          # 0 significa que atendió SIGTERM y cerró. 143 sería morir *por* la
+          # señal, y 137, que el plazo se agotó y hubo que matarlo.
+          echo "código de salida: ${salida}"
+          test "${salida}" = "0"
+
+      - if: always()
+        run: docker logs mcpizer-ci || true
