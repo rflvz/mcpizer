@@ -16,6 +16,7 @@ Fase de diseño. El enfoque arquitectónico está cerrado y el diseño detallado
 |---|---|
 | [`docs/arquitectura.md`](docs/arquitectura.md) | **Vinculante.** Estilo, invariantes y criterios de aceptación. Viaja completo a cualquier sesión de trabajo. |
 | [`docs/diseno/`](docs/diseno/) | Diseño detallado: contextos, puertos, modelo, artefacto declarativo y verificación. |
+| [`docs/sesiones.md`](docs/sesiones.md) | Cómo se trocea el trabajo: cuatro sesiones, qué entra en cada una y cuándo termina. |
 | [`docs/decisiones/`](docs/decisiones/) | Registro de decisiones tomadas durante el diseño, con su motivo. |
 
 Empieza por [`docs/diseno/README.md`](docs/diseno/README.md): dice qué documento necesita cada tipo de sesión, para no arrastrar contexto que no hace falta.

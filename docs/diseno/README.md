@@ -10,6 +10,8 @@ Cierra lo que la sección 6 de [`../arquitectura.md`](../arquitectura.md) dejó 
 
 El objetivo de la sección 7 de la arquitectura es que ninguna sesión arrastre el contexto acumulado de las anteriores. Por eso el diseño está partido: **cada documento se lee con `../arquitectura.md` y nada más.**
 
+Esta tabla es el **mínimo** por tipo de trabajo, no un techo. Las sesiones definidas en [`../sesiones.md`](../sesiones.md) son grandes y cargan el conjunto; la tabla sirve para saber qué es imprescindible y qué es contexto de apoyo.
+
 | Si la sesión va a… | Lleva |
 |---|---|
 | Montar el esqueleto, el workspace o la CI | `contextos.md` + `verificacion.md` |
@@ -55,6 +57,7 @@ Más estricto que lo que pide la sección 3, a propósito. Hace el blast radius 
 Deliberadamente, y por los mismos motivos de la sección 1 de la arquitectura:
 
 - Estructura **interna** de cada contexto.
-- Estrategia de pruebas más allá de lo que exige [`verificacion.md`](verificacion.md), empaquetado y despliegue.
+- Estrategia de pruebas más allá de lo que exige [`verificacion.md`](verificacion.md), empaquetado y despliegue — es el alcance de la sesión S4.
 - Forma sintáctica concreta de tipos y funciones.
-- Fase de sesiones — el "siguiente paso" de la sección 7 de la arquitectura, que este diseño habilita pero no ejecuta.
+
+La fase de sesiones, que era el "siguiente paso" de la sección 7 de la arquitectura, ya está definida en [`../sesiones.md`](../sesiones.md).

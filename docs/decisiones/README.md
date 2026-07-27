@@ -30,3 +30,4 @@ Las decisiones no se borran ni se editan cuando cambian: se registra una nueva q
 | [0004](0004-sin-dependencias-entre-contextos.md) | Ningún contexto importa a otro | Vigente |
 | [0005](0005-politica-solo-aditiva.md) | La política solo concede; no hay denegaciones | Vigente |
 | [0006](0006-nomenclatura-y-troceado-documental.md) | Nomenclatura en inglés y diseño en varios documentos | Vigente |
+| [0007](0007-fase-de-sesiones.md) | Fase de sesiones: cuatro sesiones grandes, hito en la CLI | Vigente |
