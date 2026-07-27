@@ -9,11 +9,14 @@
       "default": "./dist/index.js"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc -b"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "yaml": "^2.6.1"
   }
 }
