@@ -22,6 +22,10 @@
   ],
   "exclude": [
     "verification/fixtures/**",
-    "verification/surface/*.d.ts"
+    "verification/surface/*.d.ts",
+    // El artefacto construido no es fuente de este repositorio: sin esta línea,
+    // el conjunto de ficheros que se comprueba dependería de si alguien ha
+    // ejecutado `pnpm package`, que es exactamente lo que no puede pasar.
+    "deployment/dist/**"
   ]
 }
