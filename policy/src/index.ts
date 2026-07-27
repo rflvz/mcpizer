@@ -26,6 +26,7 @@ export {
   type CompiledLimits,
   type CompiledPolicy,
   type CompiledToolMapping,
+  type CompiledTransport,
   type CompiledUpstream,
   type IssuerKind,
   type PolicyAnchors,

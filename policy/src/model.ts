@@ -10,6 +10,19 @@
 export type TransportKind = 'mcp-stdio' | 'mcp-http';
 export type IssuerKind = 'oidc' | 'static-key' | 'mtls';
 
+/**
+ * Cómo se alcanza un upstream. Es el «enganche con la periferia» de
+ * `docs/diseno/artefacto.md` §1: solo hace falta en ejecución, y en seco de él
+ * únicamente se comprueba integridad referencial — nunca alcanzabilidad, que
+ * exigiría red y rompería el invariante 8.
+ *
+ * Se conserva compilado, y no solo su `kind`, porque la pasarela tiene que
+ * llegar de verdad hasta el otro lado.
+ */
+export type CompiledTransport =
+  | { readonly kind: 'mcp-stdio'; readonly command: string; readonly args: readonly string[] }
+  | { readonly kind: 'mcp-http'; readonly url: string };
+
 export interface CompiledCapability {
   readonly id: string;
   readonly description: string | undefined;
@@ -27,7 +40,7 @@ export interface CompiledToolMapping {
 
 export interface CompiledUpstream {
   readonly id: string;
-  readonly transport: TransportKind;
+  readonly transport: CompiledTransport;
   readonly tools: readonly CompiledToolMapping[];
   readonly path: string;
 }
@@ -48,6 +61,16 @@ export interface CompiledIssuer {
   readonly kind: IssuerKind;
   /** Nombre de atributo → origen. Lo no declarado aquí no puede discriminarse. */
   readonly attributes: Readonly<Record<string, string>>;
+  /**
+   * A quién identifica la clave, en los emisores `static-key`. Una clave estática
+   * no trae sujeto consigo como lo trae un token: hay que declararlo.
+   */
+  readonly subject: string | undefined;
+  /**
+   * Dónde está la clave que se compara, jamás la clave. Es la misma regla que
+   * gobierna las cuentas: el artefacto vive en git y solo lleva referencias.
+   */
+  readonly secretRef: string | undefined;
   readonly path: string;
 }
 

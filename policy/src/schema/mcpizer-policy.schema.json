@@ -86,11 +86,7 @@
             "additionalProperties": false,
             "required": ["ref"],
             "properties": {
-              "ref": {
-                "description": "Referencia resoluble en la periferia. Nunca el material en sí.",
-                "type": "string",
-                "pattern": "^[a-z][a-z0-9+.-]*://.+"
-              }
+              "ref": { "$ref": "#/$defs/secretRef" }
             }
           }
         }
@@ -113,6 +109,20 @@
               "kind": { "enum": ["oidc", "static-key", "mtls"] },
               "discovery": { "type": "string", "format": "uri" },
               "audience": { "type": "string" },
+              "subject": {
+                "description": "A quién identifica una clave estática. Un token trae sujeto; una clave, no.",
+                "type": "string",
+                "minLength": 1
+              },
+              "secret": {
+                "description": "Dónde está la clave que se compara. Nunca la clave.",
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["ref"],
+                "properties": {
+                  "ref": { "$ref": "#/$defs/secretRef" }
+                }
+              },
               "attributes": {
                 "description": "Lo no declarado aquí se descarta: la política no puede discriminar sobre ello.",
                 "type": "object",
@@ -166,6 +176,11 @@
 
   "$defs": {
     "identifier": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+    "secretRef": {
+      "description": "Referencia resoluble en la periferia. Nunca el material en sí.",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9+.-]*://.+"
+    },
     "capabilityId": {
       "description": "Identificador estable. Renombrar una tool upstream nunca lo cambia.",
       "type": "string",

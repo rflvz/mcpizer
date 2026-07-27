@@ -37,6 +37,16 @@ export interface CompiledIssuer {
   readonly kind: IssuerKind;
   /** Nombre de atributo → origen. Lo no declarado aquí no puede discriminarse. */
   readonly attributes: Readonly<Record<string, string>>;
+  /**
+   * A quién identifica la clave, en los emisores `static-key`. Una clave estática
+   * no trae sujeto consigo como lo trae un token: hay que declararlo.
+   */
+  readonly subject: string | undefined;
+  /**
+   * Dónde está la clave que se compara, jamás la clave. Es la misma regla que
+   * gobierna las cuentas: el artefacto vive en git y solo lleva referencias.
+   */
+  readonly secretRef: string | undefined;
   readonly path: string;
 }
 
@@ -64,9 +74,13 @@ export interface CompiledToolMapping {
   readonly path: string;
 }
 
+export type CompiledTransport =
+  | { readonly kind: 'mcp-stdio'; readonly command: string; readonly args: readonly string[] }
+  | { readonly kind: 'mcp-http'; readonly url: string };
+
 export interface CompiledUpstream {
   readonly id: string;
-  readonly transport: TransportKind;
+  readonly transport: CompiledTransport;
   readonly tools: readonly CompiledToolMapping[];
   readonly path: string;
 }
