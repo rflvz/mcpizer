@@ -15,6 +15,7 @@ import { readFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
 import {
   catalogFor,
+  declaredCatalogYaml,
   DEFAULT_MAX_BODY,
   HEALTH_PATH,
   mcpHttpServer,
@@ -56,8 +57,9 @@ import { renderCallOutcome, renderDiagnostics, renderDiff, renderExplanation, re
 
 const USAGE = `mcpizer — verificación en seco de políticas. Sin red, sin credenciales, sin despliegue.
 
-  <politica> es una ruta, o \`git+<url>#<ref>:<ruta>\` para leerla de un repositorio
-  a una referencia fija — que es el modo esperado en cuanto se revisa por PR.
+  <politica> es una ruta, \`git+<url>#<ref>:<ruta>\` para leerla de un repositorio a
+  una referencia fija —que es el modo esperado en cuanto se revisa por PR— o una
+  URL \`https://\`. Solo \`catalog\` y \`serve\` tocan la red.
 
   mcpizer validate <politica> [--catalog <catalogo.yaml>] [--json]
       Estructura, referencias colgantes, concesiones ambiguas y capacidades que
@@ -80,19 +82,29 @@ const USAGE = `mcpizer — verificación en seco de políticas. Sin red, sin cre
   mcpizer version [--json]
       Qué build está corriendo. Es la primera pregunta de cualquier incidencia.
 
+  mcpizer catalog <politica>
+      El catálogo declarado, generado preguntándoles a los upstreams reales.
+      Se ejecuta una vez y su salida se versiona junto a la política; a partir de
+      ahí \`validate\` y \`explain\` vuelven a funcionar sin red.
+
   mcpizer serve <politica> --issuer <id> (--catalog <catalogo.yaml> | --discover)
                 [--key-env <VAR>] [--http [--host <ip>] [--port <n>] [--key-header <cabecera>]
                 [--max-body <bytes>]]
-                [--usage <redis://…>] [--recorder <stderr|otlp>] [--otlp-endpoint <url>]
+                [--usage <redis://…>] [--recorder <stderr|file|otlp>]
+                [--otlp-endpoint <url>]
+                [--audit-file <ruta> [--audit-max-bytes <n>] [--audit-keep <n>]]
       La pasarela MCP. Un cliente ve solo lo concedido a la identidad con la que
       se conecta, e invocar una tool no listada deniega con motivo.
 
       Por stdio la clave se presenta por entorno, porque stdio no tiene
       cabeceras; con --http llega por cabecera y **por petición**, que es lo que
-      permite que dos identidades distintas compartan puerto.
+      permite que dos identidades distintas compartan puerto. Un emisor \`mtls\` la
+      recibe por la cabecera que añade el terminador TLS: --key-header.
 
       Qué implementación atiende a cada emisor, upstream y cuenta lo dice el
-      propio artefacto: \`kind\`, \`transport.kind\` y el esquema de \`secret.ref\`.
+      propio artefacto: \`kind\` (\`oidc\`, \`static-key\`, \`mtls\`), \`transport.kind\`
+      y el esquema de \`secret.ref\` — \`env://\`, \`vault://\`, \`gcp-secrets://\` o
+      \`oauth+<url>?client=…&secret=…\`, que acuña un token y lo renueva.
       La bóveda se declara con VAULT_ADDR y VAULT_TOKEN.
 
       Con --http se atiende además \`GET ${HEALTH_PATH}\`, sin credencial y sin nada
@@ -127,6 +139,9 @@ const OPTIONS = {
   'key-header': { type: 'string' },
   recorder: { type: 'string' },
   'otlp-endpoint': { type: 'string' },
+  'audit-file': { type: 'string' },
+  'audit-max-bytes': { type: 'string' },
+  'audit-keep': { type: 'string' },
   help: { type: 'boolean', short: 'h', default: false },
 } as const;
 
@@ -293,11 +308,42 @@ function parseMaxBody(value: string | undefined): number {
   return bytes;
 }
 
-function recorderChoice(kind: string | undefined, endpoint: string | undefined): RecorderChoice {
-  if (kind === undefined || kind === 'stderr') return { kind: 'stderr' };
-  if (kind !== 'otlp') throw new UsageError(`\`--recorder ${kind}\` no es \`stderr\` ni \`otlp\`.`);
+function entero(value: string | undefined, flag: string): number | undefined {
+  if (value === undefined || value === '') return undefined;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed <= 0) throw new UsageError(`\`${flag} ${value}\` no es un entero positivo.`);
+  return parsed;
+}
 
-  const target = endpoint ?? process.env['OTEL_EXPORTER_OTLP_ENDPOINT'];
+interface AuditValues {
+  readonly recorder?: string | undefined;
+  readonly endpoint?: string | undefined;
+  readonly file?: string | undefined;
+  readonly maxBytes?: string | undefined;
+  readonly keep?: string | undefined;
+}
+
+function recorderChoice(values: AuditValues): RecorderChoice {
+  const kind = values.recorder;
+  if (kind === undefined || kind === 'stderr') return { kind: 'stderr' };
+
+  if (kind === 'file') {
+    if (values.file === undefined || values.file === '') {
+      throw new UsageError('`--recorder file` necesita `--audit-file <ruta>`.');
+    }
+    const maxBytes = entero(values.maxBytes, '--audit-max-bytes');
+    const keep = entero(values.keep, '--audit-keep');
+    return {
+      kind: 'file',
+      path: values.file,
+      ...(maxBytes === undefined ? {} : { maxBytes }),
+      ...(keep === undefined ? {} : { keep }),
+    };
+  }
+
+  if (kind !== 'otlp') throw new UsageError(`\`--recorder ${kind}\` no es \`stderr\`, \`file\` ni \`otlp\`.`);
+
+  const target = values.endpoint ?? process.env['OTEL_EXPORTER_OTLP_ENDPOINT'];
   if (target === undefined || target === '') {
     throw new UsageError('`--recorder otlp` necesita `--otlp-endpoint` o `OTEL_EXPORTER_OTLP_ENDPOINT`.');
   }
@@ -317,6 +363,9 @@ interface ServeValues {
   usage?: string | undefined;
   recorder?: string | undefined;
   'otlp-endpoint'?: string | undefined;
+  'audit-file'?: string | undefined;
+  'audit-max-bytes'?: string | undefined;
+  'audit-keep'?: string | undefined;
 }
 
 /**
@@ -387,6 +436,46 @@ function armaParada(): Parada {
 }
 
 /**
+ * El catálogo declarado, generado preguntándoles a los upstreams.
+ *
+ * Cierra la deuda que las decisiones 0021 y 0025 dejaron anotada: el catálogo
+ * declarado es lo que hace posible verificar una configuración entera sin
+ * levantar nada, y hasta ahora había que escribirlo a mano.
+ *
+ * Es la única mitad del flujo que **sí** toca la red, y por eso es un comando
+ * aparte y no una bandera de `validate`: se ejecuta una vez, contra los
+ * upstreams reales, y su resultado se versiona junto a la política. A partir de
+ * ahí todo lo demás vuelve a funcionar sin red, que es el invariante 8.
+ *
+ * Sale por stdout para poder redirigirlo. El registro va a stderr, como siempre.
+ */
+async function emitCatalog(artifactPath: string): Promise<number> {
+  // Sin catálogo: aquí se está generando. Compilar en seco basta para saber qué
+  // upstreams hay, que es lo único que hace falta para preguntarles.
+  const preliminar = await load(artifactPath, undefined);
+  if (preliminar.policy === undefined) {
+    print([
+      'La política no compila; no hay upstreams a los que preguntar.',
+      '',
+      ...renderDiagnostics(preliminar.artifact.origin, preliminar.diagnostics),
+    ]);
+    return 1;
+  }
+
+  const discovery = catalogFor({ kind: 'discover', upstreams: upstreamsOf(preliminar.policy) });
+  try {
+    // Un upstream caído aborta la generación. Escribir un catálogo al que le
+    // faltan las tools de quien no contestó convertiría una caída en una
+    // revocación silenciosa el día que ese fichero se use para verificar.
+    const tools = await discovery.toolsOf();
+    process.stdout.write(declaredCatalogYaml(tools));
+    return 0;
+  } finally {
+    await discovery.close();
+  }
+}
+
+/**
  * La pasarela.
  *
  * Es el único sitio donde se comprueba que los adaptadores cumplen los
@@ -416,7 +505,13 @@ async function serve(artifactPath: string, values: ServeValues): Promise<number>
   const puerto = parsePort(values.port);
   const maxBody = parseMaxBody(values['max-body']);
   const contadores = usageChoice(values.usage);
-  const auditoria = recorderChoice(values.recorder, values['otlp-endpoint']);
+  const auditoria = recorderChoice({
+    recorder: values.recorder,
+    endpoint: values['otlp-endpoint'],
+    file: values['audit-file'],
+    maxBytes: values['audit-max-bytes'],
+    keep: values['audit-keep'],
+  });
 
   // ── Y la parada, antes del primer recurso. ─────────────────────────────────
   const parada = armaParada();
@@ -674,6 +769,8 @@ async function run(argv: readonly string[]): Promise<number> {
     else print(renderDiff(changes));
     return changes.length === 0 ? 0 : 1;
   }
+
+  if (command === 'catalog') return emitCatalog(artifactPath);
 
   if (command === 'serve') return serve(artifactPath, values);
 

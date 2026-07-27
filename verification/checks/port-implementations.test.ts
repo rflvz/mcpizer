@@ -38,14 +38,38 @@ const execFileAsync = promisify(execFile);
  * (`docs/diseno/puertos.md` §2.4).
  */
 const PUERTOS: Readonly<Record<string, readonly string[]>> = {
-  PrincipalResolver: ['static-key-principal.ts', 'oidc-principal.ts'],
-  PolicySource: ['policy-file.ts', 'policy-git.ts'],
+  PrincipalResolver: ['static-key-principal.ts', 'oidc-principal.ts', 'mtls-principal.ts'],
+  PolicySource: ['policy-file.ts', 'policy-git.ts', 'policy-http.ts'],
   CatalogSource: ['declared-catalog.ts', 'mcp-discovery.ts'],
   UsageReader: ['memory-usage.ts', 'redis-usage.ts'],
   UsageWriter: ['memory-usage.ts', 'redis-usage.ts'],
-  CredentialResolver: ['env-credentials.ts', 'vault-credentials.ts'],
+  CredentialResolver: [
+    'env-credentials.ts',
+    'vault-credentials.ts',
+    'gcp-secrets-credentials.ts',
+    'oauth-credentials.ts',
+  ],
   ToolInvoker: ['mcp-stdio-invoker.ts', 'mcp-http-invoker.ts'],
-  DecisionRecorder: ['stderr-recorder.ts', 'otlp-recorder.ts'],
+  DecisionRecorder: ['stderr-recorder.ts', 'otlp-recorder.ts', 'file-recorder.ts'],
+};
+
+/**
+ * Lo que `docs/diseno/puertos.md` §4 promete que existe, contado.
+ *
+ * La tabla de arriba es la lista real; esta es la promesa del documento. Que se
+ * comparen es lo que impide que el documento diga tres y el directorio tenga
+ * dos — el modo en que una tabla de diseño deja de describir el sistema sin que
+ * nadie se entere.
+ */
+const PROMETIDAS: Readonly<Record<string, number>> = {
+  PrincipalResolver: 3,
+  PolicySource: 3,
+  CatalogSource: 3,
+  UsageReader: 2,
+  UsageWriter: 2,
+  CredentialResolver: 4,
+  ToolInvoker: 2,
+  DecisionRecorder: 3,
 };
 
 const RETRATO = join(REPO_ROOT, 'verification', 'surface', 'runtime.d.ts');
@@ -72,7 +96,7 @@ describe('cada puerto declarado tiene al menos dos implementaciones', () => {
     expect(puertos.sort()).toEqual(Object.keys(PUERTOS).sort());
   });
 
-  it('las dos implementaciones de cada puerto existen como ficheros distintos', () => {
+  it('las implementaciones de cada puerto existen como ficheros distintos', () => {
     for (const [puerto, implementaciones] of Object.entries(PUERTOS)) {
       const distintas = new Set(implementaciones);
       expect(distintas.size, `\`${puerto}\` no tiene dos implementaciones distintas`).toBeGreaterThanOrEqual(2);
@@ -80,6 +104,19 @@ describe('cada puerto declarado tiene al menos dos implementaciones', () => {
         expect(() => readFileSync(join(REPO_ROOT, 'adapters', 'src', fichero), 'utf8')).not.toThrow();
       }
     }
+  });
+
+  it('y son tantas como `puertos.md` §4 promete', () => {
+    // `CatalogSource` cuenta tres con dos ficheros: `mcp-discovery.ts` sirve los
+    // dos transportes del protocolo con el mismo código, y el documento las
+    // cuenta como implementaciones distintas porque lo son de cara al artefacto.
+    const reales = Object.fromEntries(
+      Object.entries(PUERTOS).map(([puerto, implementaciones]) => [
+        puerto,
+        puerto === 'CatalogSource' ? implementaciones.length + 1 : implementaciones.length,
+      ]),
+    );
+    expect(reales).toEqual(PROMETIDAS);
   });
 });
 

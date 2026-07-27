@@ -117,3 +117,66 @@ export async function startHttpUpstream(): Promise<HttpUpstreamFixture> {
   const module = await load('upstream', 'http-server.js');
   return (module['startHttpUpstream'] as () => Promise<HttpUpstreamFixture>)();
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface GcpFixture {
+  readonly metadataUrl: string;
+  readonly apiBase: string;
+  /** Cada identidad prestada. Su longitud dice si se guardó o se pidió de nuevo. */
+  readonly identidades: readonly string[];
+  readonly lecturas: readonly string[];
+  /** Rota la identidad: la que el adaptador tuviera guardada deja de valer. */
+  rota(nueva?: string): void;
+  /** Deja de aceptar cualquier identidad: el caso de "me han revocado". */
+  revoca(): void;
+  admite(): void;
+  detiene(): Promise<void>;
+  close(): Promise<void>;
+}
+
+export async function startGcp(options?: {
+  secrets?: Record<string, string>;
+  expiresIn?: number;
+}): Promise<GcpFixture> {
+  const module = await load('gcp', 'server.js');
+  return (module['startGcp'] as (o?: unknown) => Promise<GcpFixture>)(options);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface OauthFixture {
+  readonly tokenUrl: string;
+  /** Cada acuñación. Su longitud dice si el token se guardó o se pidió de nuevo. */
+  readonly acuñaciones: readonly { client: string | null; scope: string | undefined }[];
+  detiene(): Promise<void>;
+  close(): Promise<void>;
+}
+
+export async function startOauth(options?: {
+  clients?: Record<string, string>;
+  expiresIn?: number;
+}): Promise<OauthFixture> {
+  const module = await load('oauth', 'server.js');
+  return (module['startOauth'] as (o?: unknown) => Promise<OauthFixture>)(options);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface PolicyHttpFixture {
+  readonly url: string;
+  readonly peticiones: readonly { path: string | undefined; cacheControl: string | undefined }[];
+  /** Cambia lo que se sirve, sin tocar ninguna cabecera de versión. */
+  sirve(nuevo: string, nuevoCodigo?: number): void;
+  detiene(): Promise<void>;
+  close(): Promise<void>;
+}
+
+export async function startPolicyHttp(options?: {
+  body?: string;
+  status?: number;
+  contentType?: string;
+}): Promise<PolicyHttpFixture> {
+  const module = await load('policy-http', 'server.js');
+  return (module['startPolicyHttp'] as (o?: unknown) => Promise<PolicyHttpFixture>)(options);
+}

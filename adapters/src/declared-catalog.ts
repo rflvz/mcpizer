@@ -7,7 +7,7 @@
  * —MCP por stdio y MCP por HTTP— llegan con la pasarela.
  */
 import { readFile } from 'node:fs/promises';
-import { parse } from 'yaml';
+import { parse, stringify } from 'yaml';
 
 export interface DiscoveredTool {
   readonly upstreamId: string;
@@ -65,4 +65,41 @@ export function declaredCatalogFile(path: string): { toolsOf(upstreamId?: string
       return upstreamId === undefined ? all : all.filter((tool) => tool.upstreamId === upstreamId);
     },
   };
+}
+
+/**
+ * El catálogo declarado, escrito.
+ *
+ * Es la otra mitad de este adaptador, y la que cierra lo que las decisiones 0021
+ * y 0025 dejaron anotado dos veces: el catálogo declarado es lo que hace posible
+ * el invariante 8 —verificar una configuración entera sin levantar ningún
+ * upstream— y hasta ahora había que escribirlo a mano.
+ *
+ * Va aquí, junto al lector, a propósito. El formato tiene un solo dueño: si el
+ * que escribe y el que lee vivieran separados, la primera vez que uno de los dos
+ * cambiara se descubriría en un despliegue.
+ *
+ * Se ordena por upstream y por nombre porque el resultado se versiona: un orden
+ * que dependiera de en qué orden contestaron los upstreams produciría un diff
+ * distinto en cada ejecución, y un fichero cuyo diff es ruido deja de revisarse.
+ */
+export function declaredCatalogYaml(tools: readonly DiscoveredTool[]): string {
+  const ordenadas = [...tools].sort(
+    (a, b) => a.upstreamId.localeCompare(b.upstreamId) || a.name.localeCompare(b.name),
+  );
+
+  return stringify(
+    {
+      version: 1,
+      tools: ordenadas.map((tool) => ({
+        upstream: tool.upstreamId,
+        name: tool.name,
+        ...(tool.description === undefined ? {} : { description: tool.description }),
+        // El esquema viaja tal cual lo dio el upstream: reescribirlo aquí sería
+        // inventarse un contrato que nadie ha declarado.
+        ...(tool.inputSchema === undefined ? {} : { inputSchema: tool.inputSchema }),
+      })),
+    },
+    { lineWidth: 0 },
+  );
 }

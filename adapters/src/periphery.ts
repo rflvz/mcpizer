@@ -25,14 +25,19 @@
  */
 import { declaredCatalogFile } from './declared-catalog.js';
 import { envCredentials } from './env-credentials.js';
+import { fileRecorder } from './file-recorder.js';
+import { gcpSecretsCredentials } from './gcp-secrets-credentials.js';
 import { mcpDiscovery, type DeclaredUpstream, type DiscoveredTool } from './mcp-discovery.js';
 import { mcpHttpInvoker } from './mcp-http-invoker.js';
 import { mcpStdioInvoker } from './mcp-stdio-invoker.js';
 import { memoryUsage } from './memory-usage.js';
+import { mtlsPrincipals, type MtlsIssuer } from './mtls-principal.js';
+import { oauthCredentials } from './oauth-credentials.js';
 import { oidcPrincipals, type OidcIssuer } from './oidc-principal.js';
 import { otlpRecorder } from './otlp-recorder.js';
 import { policyFile } from './policy-file.js';
 import { parseGitOrigin, policyGit } from './policy-git.js';
+import { parseHttpOrigin, policyHttp } from './policy-http.js';
 import { redisUsage } from './redis-usage.js';
 import { staticKeyPrincipals, type IssuerVault, type StaticKeyIssuer } from './static-key-principal.js';
 import { stderrRecorder } from './stderr-recorder.js';
@@ -63,12 +68,26 @@ export type UsageChoice = { readonly kind: 'memory' } | { readonly kind: 'redis'
 
 export type RecorderChoice =
   | { readonly kind: 'stderr' }
-  | { readonly kind: 'otlp'; readonly endpoint: string; readonly serviceName?: string };
+  | { readonly kind: 'otlp'; readonly endpoint: string; readonly serviceName?: string }
+  | { readonly kind: 'file'; readonly path: string; readonly maxBytes?: number; readonly keep?: number };
 
 /** Dónde está la bóveda. Sin ella, `vault://` no se resuelve y se dice por qué. */
 export interface VaultAccess {
   readonly address: string;
   readonly token: string;
+}
+
+/**
+ * Dónde vive el gestor de secretos del proveedor cloud.
+ *
+ * No se declara en el artefacto —es un hecho del despliegue, como la bóveda— y
+ * casi nunca hace falta: los valores por defecto son los de la plataforma. Se
+ * puede fijar para un punto de acceso privado, y es lo que permite ejercitarlo
+ * sin salir a la red.
+ */
+export interface CloudSecretsAccess {
+  readonly metadataUrl?: string;
+  readonly apiBase?: string;
 }
 
 export interface PeripherySpec {
@@ -77,6 +96,7 @@ export interface PeripherySpec {
   readonly usage?: UsageChoice;
   readonly recorder?: RecorderChoice;
   readonly vault?: VaultAccess;
+  readonly cloud?: CloudSecretsAccess;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -84,14 +104,21 @@ export interface PeripherySpec {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * `PolicySource`: fichero o git, según la forma del argumento.
+ * `PolicySource`: fichero, git o HTTP, según la forma del argumento.
  *
- * `git+<url>#<ref>:<ruta>` en vez de una bandera nueva: así los cinco comandos
- * de la CLI aceptan las dos formas sin que ninguno tenga que enterarse.
+ * La forma del especificador en vez de una bandera nueva: así los comandos de la
+ * CLI aceptan las tres sin que ninguno tenga que enterarse. Se prueban en orden
+ * y lo que no reconoce nadie acaba siendo una ruta de fichero, que es lo que
+ * hace que `mcpizer validate politica.yaml` siga significando lo que parece.
  */
 export function policySourceFor(specifier: string): { load(): Promise<{ text: string; version: string; origin: string }> } {
   const git = parseGitOrigin(specifier);
-  return git === undefined ? policyFile(specifier) : policyGit(git);
+  if (git !== undefined) return policyGit(git);
+
+  const http = parseHttpOrigin(specifier);
+  if (http !== undefined) return policyHttp(http);
+
+  return policyFile(specifier);
 }
 
 export interface CatalogPeriphery {
@@ -214,17 +241,35 @@ function oidcIssuersOf(issuers: readonly PeripheryIssuer[]): OidcIssuer[] {
   );
 }
 
+/**
+ * Uno `mtls` no necesita declarar nada más.
+ *
+ * Quien verifica la cadena es el terminador TLS, así que aquí no hay endpoint
+ * que descubrir ni clave que leer: basta con que el artefacto diga que ese
+ * emisor se identifica por certificado. Declararlo **es** la decisión de confiar
+ * en la cabecera que el terminador añade, y por eso vive en el artefacto, que se
+ * revisa por PR (decisión 0037).
+ */
+function mtlsIssuersOf(issuers: readonly PeripheryIssuer[]): MtlsIssuer[] {
+  return issuers.flatMap((issuer) =>
+    issuer.kind === 'mtls' ? [{ id: issuer.id, attributes: issuer.attributes }] : [],
+  );
+}
+
 export function periphery(spec: PeripherySpec): Periphery {
   const vault: IssuerVault | undefined = spec.vault;
 
   // ── PrincipalResolver: despacho por `issuers[].kind`. ──────────────────────
   const estaticos = staticKeyIssuersOf(spec.issuers);
   const oidc = oidcIssuersOf(spec.issuers);
+  const mtls = mtlsIssuersOf(spec.issuers);
   const porClave = staticKeyPrincipals(estaticos, vault);
   const porToken = oidcPrincipals(oidc);
-  const kindOf = new Map<string, 'static-key' | 'oidc'>([
+  const porCertificado = mtlsPrincipals(mtls);
+  const kindOf = new Map<string, 'static-key' | 'oidc' | 'mtls'>([
     ...estaticos.map((issuer) => [issuer.id, 'static-key'] as const),
     ...oidc.map((issuer) => [issuer.id, 'oidc'] as const),
+    ...mtls.map((issuer) => [issuer.id, 'mtls'] as const),
   ]);
 
   const principals = {
@@ -236,29 +281,46 @@ export function periphery(spec: PeripherySpec): Periphery {
       // Un emisor declarado pero sin fontanería no autentica a nadie, y eso es
       // lo mismo que uno que no existe: no hay contra qué validar.
       if (kind === undefined) return { ok: false, problem: 'issuer_unknown' };
-      return kind === 'oidc' ? porToken.resolve(credentials) : porClave.resolve(credentials);
+      if (kind === 'oidc') return porToken.resolve(credentials);
+      if (kind === 'mtls') return porCertificado.resolve(credentials);
+      return porClave.resolve(credentials);
     },
   };
 
   // ── CredentialResolver: despacho por el esquema de la referencia. ──────────
   const porEntorno = envCredentials();
   const porBoveda = vault === undefined ? undefined : vaultCredentials(vault);
+  const porNube = gcpSecretsCredentials(spec.cloud ?? {});
+
+  /**
+   * Todo menos `oauth+`, que es el que necesita a los demás.
+   *
+   * Una referencia `oauth+` nombra otra referencia —dónde está el secreto de su
+   * cliente—, y esa la resuelve este despachador. Separar las dos mitades es lo
+   * que rompe el bucle sin necesidad de un caso especial dentro del adaptador.
+   */
+  async function resuelveGuardada(secretRef: string): Promise<{ value: string }> {
+    if (secretRef.startsWith('env://')) return porEntorno.resolve(secretRef);
+    if (secretRef.startsWith('gcp-secrets://')) return porNube.resolve(secretRef);
+    if (secretRef.startsWith('vault://')) {
+      if (porBoveda === undefined) {
+        // Se dice qué falta, no se degrada. Ninguna forma de fallo puede acabar
+        // en ejecutar sin credencial.
+        throw new Error(
+          `La referencia \`${secretRef}\` necesita una bóveda, y no hay ninguna configurada. ` +
+            'Declara `VAULT_ADDR` y `VAULT_TOKEN`.',
+        );
+      }
+      return porBoveda.resolve(secretRef);
+    }
+    throw new Error(`La referencia \`${secretRef}\` usa un esquema que ningún adaptador resuelve.`);
+  }
+
+  const porOauth = oauthCredentials({ resolveClientSecret: resuelveGuardada });
 
   const credentials = {
     async resolve(secretRef: string): Promise<{ value: string }> {
-      if (secretRef.startsWith('env://')) return porEntorno.resolve(secretRef);
-      if (secretRef.startsWith('vault://')) {
-        if (porBoveda === undefined) {
-          // Se dice qué falta, no se degrada. Ninguna forma de fallo puede
-          // acabar en ejecutar sin credencial.
-          throw new Error(
-            `La referencia \`${secretRef}\` necesita una bóveda, y no hay ninguna configurada. ` +
-              'Declara `VAULT_ADDR` y `VAULT_TOKEN`.',
-          );
-        }
-        return porBoveda.resolve(secretRef);
-      }
-      throw new Error(`La referencia \`${secretRef}\` usa un esquema que ningún adaptador resuelve.`);
+      return secretRef.startsWith('oauth+') ? porOauth.resolve(secretRef) : resuelveGuardada(secretRef);
     },
   };
 
@@ -281,13 +343,22 @@ export function periphery(spec: PeripherySpec): Periphery {
 
   // ── DecisionRecorder: elección de despliegue. ──────────────────────────────
   const recorderChoice = spec.recorder ?? { kind: 'stderr' };
-  const recorder =
-    recorderChoice.kind === 'otlp'
-      ? otlpRecorder({
-          endpoint: recorderChoice.endpoint,
-          ...(recorderChoice.serviceName === undefined ? {} : { serviceName: recorderChoice.serviceName }),
-        })
-      : stderrRecorder();
+  const recorder = ((): { record(entry: DecisionEntry): void } => {
+    if (recorderChoice.kind === 'otlp') {
+      return otlpRecorder({
+        endpoint: recorderChoice.endpoint,
+        ...(recorderChoice.serviceName === undefined ? {} : { serviceName: recorderChoice.serviceName }),
+      });
+    }
+    if (recorderChoice.kind === 'file') {
+      return fileRecorder({
+        path: recorderChoice.path,
+        ...(recorderChoice.maxBytes === undefined ? {} : { maxBytes: recorderChoice.maxBytes }),
+        ...(recorderChoice.keep === undefined ? {} : { keep: recorderChoice.keep }),
+      });
+    }
+    return stderrRecorder();
+  })();
 
   return {
     principals,
