@@ -8,9 +8,23 @@ Las dos identidades nunca son la misma cosa. **Quién invoca** es el principal: 
 
 ## Estado
 
-**Sesión 2 completada**: la pasarela. Un cliente MCP real se conecta y ve solo lo concedido a su identidad; invocar una tool no listada deniega con el motivo y el sitio exacto del artefacto que hay que tocar.
+**Sesión 3 completada**: la periferia real. Cada puerto tiene al menos **dos** implementaciones, intercambiables sin tocar el núcleo ni la orquestación.
 
-Los siete puertos están declarados y cada uno tiene **una** implementación, la más simple: clave estática, fichero, catálogo declarado, contadores en memoria, credenciales por entorno, cliente MCP por stdio y registro JSON. La segunda implementación de cada frontera —OIDC, git, MCP sobre HTTP, Vault, Redis, OpenTelemetry— es la sesión 3, en [`docs/sesiones.md`](docs/sesiones.md) §5.
+| Puerto | Lo mínimo | Lo real |
+|---|---|---|
+| ¿quién invoca? | clave estática | **OIDC/JWT** con validación por JWKS |
+| ¿de dónde sale la política? | fichero | **git** a una referencia fija |
+| ¿qué tools hay? | catálogo declarado | **descubrimiento MCP** (`tools/list`) |
+| ¿cuánto se ha usado? | memoria del proceso | **Redis** |
+| ¿de dónde sale la credencial? | variable de entorno | **HashiCorp Vault** |
+| ¿cómo se invoca? | MCP por stdio | **MCP por HTTP** streamable |
+| ¿dónde va la auditoría? | JSON a stderr | **OpenTelemetry** por OTLP |
+
+Y la pasarela habla los dos transportes también **de cara al cliente**: por stdio la clave llega por entorno, y por HTTP por cabecera y por petición, que es lo que permite que dos identidades compartan puerto.
+
+Qué implementación atiende a cada emisor, upstream y cuenta **lo dice el propio artefacto** —`kind`, `transport.kind` y el esquema de `secret.ref`—, así que la misma ejecución habla stdio con un upstream y HTTP con otro, y resuelve `env://` para una cuenta y `vault://` para la siguiente. Lo que no cabe en el artefacto —de dónde se carga el propio artefacto, dónde viven los contadores, adónde va la auditoría— se elige al arrancar, porque son hechos del despliegue y no de la política ([decisión 0022](docs/decisiones/0022-donde-se-elige-la-implementacion-de-cada-puerto.md)).
+
+Queda la sesión 4: empaquetado, despliegue y operación ([`docs/sesiones.md`](docs/sesiones.md) §5).
 
 ## Empezar
 
@@ -53,7 +67,18 @@ MCPIZER_CI_KEY=... MCPIZER_API_KEY=... \
 mcpizer serve examples/policy.yaml --catalog examples/catalog.yaml --issuer ci
 ```
 
-Habla stdio por los dos lados: el cliente arranca este proceso, y este arranca los upstreams declarados. La clave llega por entorno porque stdio no tiene cabeceras — con HTTP, en la sesión 3, será una cabecera.
+Por stdio el cliente arranca este proceso, y este arranca los upstreams declarados; la clave llega por entorno porque stdio no tiene cabeceras. La misma pasarela, con la periferia de un despliegue de verdad:
+
+```bash
+VAULT_ADDR=https://vault.internal VAULT_TOKEN=... \
+mcpizer serve 'git+https://git.internal/infra/politicas.git#refs/heads/main:mcpizer.yaml' \
+  --discover --issuer corp \
+  --http --port 8080 \
+  --usage redis://contadores.internal:6379 \
+  --recorder otlp --otlp-endpoint http://otel-collector:4318
+```
+
+Con `--http` la credencial del cliente llega en `Authorization: Bearer` y se lee **en cada petición**: un servidor que cerrara sobre una identidad fija atendería a todos con la del primero, que es un fallo de autorización y no de fontanería ([decisión 0027](docs/decisiones/0027-la-credencial-del-cliente-llega-por-peticion.md)).
 
 Lo que el cliente ve en `tools/list` es **la misma decisión** que contesta `explain`, aplicada a cada capacidad. No es un filtro aparte que haya que mantener sincronizado con la autorización, así que el fallo clásico —una tool que se oculta pero sigue siendo invocable si se adivina su nombre— no puede ocurrir por construcción.
 
@@ -98,11 +123,14 @@ Los nueve criterios de la sección 5 de la arquitectura "se ejecutan y se respon
 | Ningún contexto importa a otro | Cero aristas, sin excepciones, más la prohibición de paquete común |
 | Cada contexto declara su superficie | `exports` con entrada única; el import profundo no resuelve en Node |
 | El núcleo es puro | Sin `node:*`, sin reloj, sin aleatoriedad, y sus tests sin un solo doble |
-| Blast radius | Retrato versionado de la superficie pública de cada contexto |
+| Blast radius | Retrato versionado de la superficie pública de cada contexto — y de `runtime`, cuya entrada **son** los siete puertos |
 | Fallo cerrado y explicabilidad | Tests de propiedad sobre artefactos generados |
-| Ninguna credencial en registros ni motivos | Centinela irrepetible, y un escáner sobre todo lo observable |
+| Ninguna credencial en registros ni motivos | Centinela irrepetible, y un escáner sobre todo lo observable, en las dos periferias |
+| Dos implementaciones por puerto, intercambiables | Se recorre la pasarela entera dos veces y se comparan las decisiones |
 
 Y **cada una tiene un caso que la hace fallar**, en [`verification/fixtures/violations/`](verification/fixtures/violations/). Una comprobación que nunca ha fallado no está verificada: sin ese caso, una sesión larga cree tener red y no la tiene, que es peor que no tenerla porque cambia cómo se decide.
+
+La última fila es el criterio de terminación de la sesión 3 hecho comando. Se monta la misma política con dos periferias completas —fichero·declarado·clave estática·memoria·entorno·stdio·stderr, y git·descubrimiento·OIDC·Redis·Vault·HTTP·OTLP—, se hace el mismo recorrido, y las decisiones tienen que salir idénticas. Todo corre en proceso, contra servidores de fixture que hablan los protocolos de verdad: no hace falta Docker, ni red, ni un servicio levantado.
 
 ## Las cinco capacidades del dominio
 

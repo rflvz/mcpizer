@@ -13,7 +13,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
-import { CONTEXTS } from '../rules/packages.js';
+import { PORTRAYED } from '../rules/packages.js';
 
 const REPO_ROOT = fileURLToPath(new URL('../..', import.meta.url));
 const HERE = fileURLToPath(new URL('.', import.meta.url));
@@ -72,7 +72,7 @@ function surfaceOf(context) {
 const mode = process.argv[2] ?? '--check';
 const stale = [];
 
-for (const context of CONTEXTS) {
+for (const context of PORTRAYED) {
   const target = join(HERE, `${context}.d.ts`);
   const current = surfaceOf(context);
   if (mode === '--write') {
@@ -90,11 +90,11 @@ for (const context of CONTEXTS) {
 }
 
 if (mode === '--write') {
-  console.log(`Retratos regenerados para: ${CONTEXTS.join(', ')}.`);
+  console.log(`Retratos regenerados para: ${PORTRAYED.join(', ')}.`);
 } else if (stale.length > 0) {
   console.error(stale.join('\n'));
   console.error('\nSi el cambio es deliberado, ejecuta `pnpm surface` y revisa el diff.');
   process.exit(1);
 } else {
-  console.log('La superficie pública de los cinco contextos no ha cambiado.');
+  console.log(`La superficie pública de ${PORTRAYED.join(', ')} no ha cambiado.`);
 }
