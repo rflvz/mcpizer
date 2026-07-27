@@ -1,0 +1,6 @@
+{
+  "name": "mcpizer",
+  "version": "0.1.0",
+  "private": true,
+  "comentario": "El repositorio dice una versión y el artefacto dice otra. Es el descuido silencioso: nada se rompe, nada avisa, y el día de una incidencia el número que imprime el proceso desplegado no corresponde a ningún commit."
+}
