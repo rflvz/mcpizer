@@ -1,0 +1,38 @@
+{
+  "name": "mcpizer",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "clean": "tsc -b --clean",
+    "typecheck": "tsc -p tsconfig.tests.json",
+    "lint": "eslint .",
+    "check:deps": "depcruise --config .dependency-cruiser.js principals/src capabilities/src accounts/src access/src policy/src adapters/src runtime/src",
+    "check:surface": "node verification/surface/generate.js --check",
+    "surface": "node verification/surface/generate.js --write",
+    "test": "vitest run",
+    "verify": "pnpm build && pnpm typecheck && pnpm lint && pnpm check:deps && pnpm check:surface && pnpm test",
+    "mcpizer": "node runtime/dist/cli/main.js"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.17.0",
+    "@mcpizer/access": "workspace:*",
+    "@types/node": "^22.10.2",
+    "dependency-cruiser": "^16.10.0",
+    "eslint": "^9.17.0",
+    "fast-check": "^3.23.2",
+    "globals": "^17.8.0",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.18.1",
+    "vitest": "^2.1.8"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "name": "@mcpizer/runtime",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "dependencies": {
+    "@mcpizer/access": "workspace:*",
+    "@mcpizer/accounts": "workspace:*",
+    "@mcpizer/adapters": "workspace:*",
+    "@mcpizer/capabilities": "workspace:*",
+    "@mcpizer/policy": "workspace:*",
+    "@mcpizer/principals": "workspace:*"
+  },
+  "bin": {
+    "mcpizer": "./dist/cli/main.js"
+  }
+}

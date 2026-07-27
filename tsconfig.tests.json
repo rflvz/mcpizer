@@ -1,0 +1,26 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false,
+    "types": [
+      "node"
+    ],
+    "allowJs": true
+  },
+  "include": [
+    "*/test/**/*.ts",
+    "verification/**/*.ts",
+    "verification/**/*.js",
+    "*.ts",
+    ".dependency-cruiser.js",
+    "eslint.config.js"
+  ],
+  "exclude": [
+    "verification/fixtures/**",
+    "verification/surface/*.d.ts"
+  ]
+}

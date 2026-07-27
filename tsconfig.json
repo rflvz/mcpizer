@@ -1,0 +1,12 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./principals" },
+    { "path": "./capabilities" },
+    { "path": "./accounts" },
+    { "path": "./access" },
+    { "path": "./policy" },
+    { "path": "./adapters" },
+    { "path": "./runtime" }
+  ]
+}
