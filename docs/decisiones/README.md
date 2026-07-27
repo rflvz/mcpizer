@@ -53,3 +53,10 @@ Las decisiones no se borran ni se editan cuando cambian: se registra una nueva q
 | [0027](0027-la-credencial-del-cliente-llega-por-peticion.md) | Con HTTP la credencial del cliente llega por cabecera y por petición | Vigente |
 | [0028](0028-policy-source-sobre-git.md) | `PolicySource` sobre git: la versión es el sha, y se lee sin copia de trabajo | Vigente |
 | [0029](0029-discovery-y-audience-salen-del-documento.md) | `discovery` y `audience` los lee la cáscara del documento | Vigente |
+| [0030](0030-el-artefacto-desplegable-es-el-cierre-de-runtime.md) | El artefacto desplegable es `runtime` con su cierre, producido por `pnpm deploy` | Vigente |
+| [0031](0031-el-empaquetado-vive-en-deployment.md) | El empaquetado vive en `deployment/`, un directorio sin manifiesto | Vigente |
+| [0032](0032-la-imagen-es-una-envoltura.md) | La imagen es una envoltura, y el criterio de terminación no la necesita | Vigente |
+| [0033](0033-tls-fuera-cors-ninguno-techo-dentro.md) | TLS fuera, CORS ninguno, techo de petición dentro | Vigente |
+| [0034](0034-la-parada-ordenada-la-conecta-la-cascara.md) | La parada ordenada la conecta la cáscara; sin puerto de señales, salud ni configuración | Vigente |
+| [0035](0035-una-version-para-el-producto.md) | Una versión para el producto; los siete paquetes siguen privados | Vigente |
+| [0036](0036-lo-que-s4-no-cierra.md) | Lo que S4 no cierra, y por qué | Vigente |

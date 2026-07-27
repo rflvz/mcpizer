@@ -1,6 +1,6 @@
 {
   "name": "mcpizer",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "packageManager": "pnpm@10.33.0",
   "type": "module",
@@ -16,6 +16,7 @@
     "check:surface": "node verification/surface/generate.js --check",
     "surface": "node verification/surface/generate.js --write",
     "test": "vitest run",
+    "package": "node deployment/package.js",
     "verify": "pnpm build && pnpm typecheck && pnpm lint && pnpm check:deps && pnpm check:surface && pnpm test",
     "mcpizer": "node runtime/dist/cli/main.js"
   },

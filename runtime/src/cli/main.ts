@@ -11,9 +11,12 @@
  * la salida estándar. El instante se captura *aquí* y entra en la decisión como
  * un hecho más — por eso no existe un puerto `Clock`.
  */
+import { readFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
 import {
   catalogFor,
+  DEFAULT_MAX_BODY,
+  HEALTH_PATH,
   mcpHttpServer,
   mcpStdioServer,
   periphery,
@@ -74,8 +77,12 @@ const USAGE = `mcpizer — verificación en seco de políticas. Sin red, sin cre
   mcpizer schema
       El JSON Schema del artefacto, para editores y validadores externos.
 
+  mcpizer version [--json]
+      Qué build está corriendo. Es la primera pregunta de cualquier incidencia.
+
   mcpizer serve <politica> --issuer <id> (--catalog <catalogo.yaml> | --discover)
-                [--key-env <VAR>] [--http [--port <n>] [--key-header <cabecera>]]
+                [--key-env <VAR>] [--http [--host <ip>] [--port <n>] [--key-header <cabecera>]
+                [--max-body <bytes>]]
                 [--usage <redis://…>] [--recorder <stderr|otlp>] [--otlp-endpoint <url>]
       La pasarela MCP. Un cliente ve solo lo concedido a la identidad con la que
       se conecta, e invocar una tool no listada deniega con motivo.
@@ -87,6 +94,18 @@ const USAGE = `mcpizer — verificación en seco de políticas. Sin red, sin cre
       Qué implementación atiende a cada emisor, upstream y cuenta lo dice el
       propio artefacto: \`kind\`, \`transport.kind\` y el esquema de \`secret.ref\`.
       La bóveda se declara con VAULT_ADDR y VAULT_TOKEN.
+
+      Con --http se atiende además \`GET ${HEALTH_PATH}\`, sin credencial y sin nada
+      canjeable dentro. --host por defecto es la interfaz de bucle; dentro de un
+      contenedor hay que abrirla (--host 0.0.0.0) para que la sonda llegue.
+      --max-body (${DEFAULT_MAX_BODY} bytes por defecto) acota lo que se acepta antes
+      de decidir nada: la denegación llega después de haber leído la petición.
+
+      TLS lo termina el despliegue, no este proceso, y aquí no se emite ninguna
+      cabecera CORS: un origen web no es un cliente MCP (decisión 0033).
+
+      SIGTERM y SIGINT cierran ordenadamente —clientes, sesiones upstream,
+      contadores y auditoría, en ese orden— y salen con 0.
 
 Códigos de salida: 0 sin hallazgos · 1 hallazgos · 2 uso incorrecto · 3 origen inalcanzable.`;
 
@@ -102,7 +121,9 @@ const OPTIONS = {
   usage: { type: 'string' },
   'key-env': { type: 'string' },
   http: { type: 'boolean', default: false },
+  host: { type: 'string' },
   port: { type: 'string' },
+  'max-body': { type: 'string' },
   'key-header': { type: 'string' },
   recorder: { type: 'string' },
   'otlp-endpoint': { type: 'string' },
@@ -111,6 +132,34 @@ const OPTIONS = {
 
 /** De dónde lee la pasarela la clave que el cliente presenta, si nadie dice otra cosa. */
 const DEFAULT_KEY_ENV = 'MCPIZER_API_KEY';
+
+/**
+ * En qué interfaz escucha la pasarela si nadie dice otra cosa.
+ *
+ * La de bucle, no la de todas: abrir un puerto de autorización a la red por
+ * defecto es la clase de descuido que no se nota hasta que alguien lo encuentra.
+ * Un contenedor sí necesita abrirla, y lo dice explícitamente con `--host`.
+ */
+const DEFAULT_HOST = '127.0.0.1';
+
+/**
+ * Qué build está corriendo.
+ *
+ * Se lee del manifiesto que acompaña al programa, que es el mismo fichero en el
+ * árbol de trabajo y dentro del artefacto desplegable. Un número cableado en el
+ * código diría la verdad hasta el primer despliegue en que alguien olvidara
+ * tocarlo.
+ */
+function selfVersion(): string {
+  try {
+    const manifest = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8')) as {
+      version?: unknown;
+    };
+    return typeof manifest.version === 'string' ? manifest.version : 'desconocida';
+  } catch {
+    return 'desconocida';
+  }
+}
 
 class UsageError extends Error {}
 
@@ -226,6 +275,24 @@ function usageChoice(value: string | undefined): UsageChoice {
   throw new UsageError(`\`--usage ${value}\` no es \`memory\` ni una URL \`redis://\`.`);
 }
 
+function parsePort(value: string | undefined): number {
+  const port = value === undefined ? 0 : Number(value);
+  if (!Number.isInteger(port) || port < 0 || port > 65_535) {
+    throw new UsageError(`\`--port ${String(value)}\` no es un puerto.`);
+  }
+  return port;
+}
+
+/** El techo de tamaño de petición. Un knob de operación: depende de qué tools se atienden. */
+function parseMaxBody(value: string | undefined): number {
+  if (value === undefined || value === '') return DEFAULT_MAX_BODY;
+  const bytes = Number(value);
+  if (!Number.isInteger(bytes) || bytes <= 0) {
+    throw new UsageError(`\`--max-body ${value}\` no es un número de bytes positivo.`);
+  }
+  return bytes;
+}
+
 function recorderChoice(kind: string | undefined, endpoint: string | undefined): RecorderChoice {
   if (kind === undefined || kind === 'stderr') return { kind: 'stderr' };
   if (kind !== 'otlp') throw new UsageError(`\`--recorder ${kind}\` no es \`stderr\` ni \`otlp\`.`);
@@ -243,11 +310,80 @@ interface ServeValues {
   issuer?: string | undefined;
   'key-env'?: string | undefined;
   http?: boolean | undefined;
+  host?: string | undefined;
   port?: string | undefined;
+  'max-body'?: string | undefined;
   'key-header'?: string | undefined;
   usage?: string | undefined;
   recorder?: string | undefined;
   'otlp-endpoint'?: string | undefined;
+}
+
+/**
+ * Lo que contesta la sonda de salud.
+ *
+ * Se compone aquí, no en el adaptador, porque es el único sitio que sabe qué hay
+ * y qué de eso es publicable. Va sin credencial a quien pregunte, así que la
+ * regla es dura: **solo lo que no abre nada y no describe la instalación**.
+ *
+ * Sale la versión del artefacto de política —una huella del contenido, o el sha
+ * en git—, que es lo que un operador necesita para saber si el proceso ya recogió
+ * el cambio. No sale `origin`: es una ruta del sistema de ficheros o una URL de
+ * repositorio, y una URL de repositorio es el sitio exacto donde alguien acaba
+ * embebiendo un token.
+ */
+function healthReport(version: string, policyVersion: string): () => Readonly<Record<string, unknown>> {
+  return () => ({ status: 'ok', version, policy: { version: policyVersion } });
+}
+
+/**
+ * El cierre ordenado.
+ *
+ * Un orquestador manda SIGTERM y cuenta hasta su plazo antes de mandar SIGKILL.
+ * Lo que se hace con ese margen es: dejar de aceptar, cerrar las sesiones
+ * upstream —que en stdio son procesos hijo que quedarían huérfanos— y vaciar la
+ * auditoría, que es lo último porque lo ocurrido durante el cierre también se
+ * audita.
+ *
+ * **Se arma antes de abrir nada.** La ventana entre "empieza el arranque" y "hay
+ * servidor que parar" no es corta: con `--discover` dura lo que tarde el upstream
+ * más lento. Una señal ahí, sin manejador, mata el proceso por disposición por
+ * defecto y deja vivos los hijos que el descubrimiento ya había arrancado.
+ * Mientras no hay nada que parar, la parada se **anota**; se atiende en cuanto lo
+ * hay.
+ *
+ * No hay temporizador que fuerce la salida. Un proceso que no termina solo tiene
+ * un asa abierta que nadie cerró, y taparlo con `process.exit()` convertiría esa
+ * fuga en algo que ya no se puede ver. Y como los manejadores son de un solo uso,
+ * una **segunda** señal encuentra la disposición por defecto: quien quiera
+ * insistir puede, sin llegar a `SIGKILL`.
+ */
+interface Parada {
+  /** Qué parar, en cuanto se sabe. Si ya se había pedido parar, para al asignarlo. */
+  atiende(stop: () => void): void;
+  desarma(): void;
+}
+
+function armaParada(): Parada {
+  let pedida = false;
+  let parar: (() => void) | undefined;
+
+  const señales: NodeJS.Signals[] = ['SIGTERM', 'SIGINT'];
+  const manejador = (): void => {
+    pedida = true;
+    parar?.();
+  };
+  for (const señal of señales) process.once(señal, manejador);
+
+  return {
+    atiende(stop): void {
+      parar = stop;
+      if (pedida) stop();
+    },
+    desarma(): void {
+      for (const señal of señales) process.off(señal, manejador);
+    },
+  };
 }
 
 /**
@@ -261,6 +397,12 @@ interface ServeValues {
  * además la comprobación de que las dos encajan en el mismo hueco.
  */
 async function serve(artifactPath: string, values: ServeValues): Promise<number> {
+  // ── Primero, todo lo que puede rechazarse sin abrir nada. ──────────────────
+  //
+  // El orden importa más de lo que parece: una bandera mal escrita comprobada
+  // *después* de arrancar el descubrimiento deja un proceso que sale con código
+  // de uso y no termina, porque los hijos que ya arrancó lo mantienen vivo. Lo
+  // barato de detectar se detecta antes de que haya algo que cerrar.
   const issuerId = required(values.issuer, '--issuer');
   const keyEnv = values['key-env'] ?? DEFAULT_KEY_ENV;
 
@@ -271,57 +413,107 @@ async function serve(artifactPath: string, values: ServeValues): Promise<number>
     throw new UsageError('`--catalog` y `--discover` son dos orígenes del catálogo; hay que elegir uno.');
   }
 
-  // El descubrimiento necesita saber qué upstreams hay, y eso solo lo dice la
-  // política compilada — que a su vez quiere el catálogo para comprobar el
-  // mapeo. Se rompe el bucle compilando primero sin catálogo: es una lectura
-  // más del artefacto al arrancar, y a cambio ningún contrato se entera.
-  let catalog: CatalogPeriphery | undefined = declaredCatalog(values.catalog);
-  if (values.discover === true) {
-    const preliminar = await load(artifactPath, undefined);
-    if (preliminar.policy === undefined) {
+  const puerto = parsePort(values.port);
+  const maxBody = parseMaxBody(values['max-body']);
+  const contadores = usageChoice(values.usage);
+  const auditoria = recorderChoice(values.recorder, values['otlp-endpoint']);
+
+  // ── Y la parada, antes del primer recurso. ─────────────────────────────────
+  const parada = armaParada();
+
+  let catalog: CatalogPeriphery | undefined;
+  let outside: Periphery | undefined;
+  try {
+    // El descubrimiento necesita saber qué upstreams hay, y eso solo lo dice la
+    // política compilada — que a su vez quiere el catálogo para comprobar el
+    // mapeo. Se rompe el bucle compilando primero sin catálogo: es una lectura
+    // más del artefacto al arrancar, y a cambio ningún contrato se entera.
+    catalog = declaredCatalog(values.catalog);
+    if (values.discover === true) {
+      const preliminar = await load(artifactPath, undefined);
+      if (preliminar.policy === undefined) {
+        print([
+          'La política no compila; no hay upstreams a los que preguntar.',
+          '',
+          ...renderDiagnostics(preliminar.artifact.origin, preliminar.diagnostics),
+        ]);
+        return 1;
+      }
+      catalog = catalogFor({ kind: 'discover', upstreams: upstreamsOf(preliminar.policy) });
+    }
+
+    const loaded = await load(artifactPath, catalog);
+    if (loaded.policy === undefined) {
       print([
-        'La política no compila; no hay upstreams a los que preguntar.',
+        'La política no compila; no hay pasarela que levantar.',
         '',
-        ...renderDiagnostics(preliminar.artifact.origin, preliminar.diagnostics),
+        ...renderDiagnostics(loaded.artifact.origin, loaded.diagnostics),
       ]);
       return 1;
     }
-    catalog = catalogFor({ kind: 'discover', upstreams: upstreamsOf(preliminar.policy) });
-  }
 
-  const loaded = await load(artifactPath, catalog);
-  if (loaded.policy === undefined) {
+    // El catálogo ya ha dicho todo lo que sabía: el descubrimiento ocurre una
+    // vez al arrancar (decisión 0025) y lo compilado no vuelve a preguntarle.
+    // Cerrarlo aquí devuelve los procesos hijo que abrió, en vez de tenerlos
+    // ociosos durante toda la vida del proceso.
     await catalog?.close();
-    print([
-      'La política no compila; no hay pasarela que levantar.',
-      '',
-      ...renderDiagnostics(loaded.artifact.origin, loaded.diagnostics),
-    ]);
-    return 1;
-  }
+    catalog = undefined;
 
-  const outside: Periphery = periphery({
-    issuers: peripheryIssuers(loaded.policy, loaded.document?.value),
-    upstreams: upstreamsOf(loaded.policy),
-    usage: usageChoice(values.usage),
-    recorder: recorderChoice(values.recorder, values['otlp-endpoint']),
-    ...(vaultAccess() === undefined ? {} : { vault: vaultAccess() as VaultAccess }),
-  });
+    outside = periphery({
+      issuers: peripheryIssuers(loaded.policy, loaded.document?.value),
+      upstreams: upstreamsOf(loaded.policy),
+      usage: contadores,
+      recorder: auditoria,
+      ...(vaultAccess() === undefined ? {} : { vault: vaultAccess() as VaultAccess }),
+    });
 
-  // Un emisor que no declara su fontanería no autentica a nadie. No es un error
-  // de autoría —el enganche con la periferia es opcional (decisión 0017)— pero
-  // tampoco sirve aquí, y decirlo al arrancar es mejor que dejar que el primer
-  // cliente se estrelle contra `issuer_unknown`.
-  if (!outside.usableIssuers.includes(issuerId)) {
-    await outside.close();
+    // Un emisor que no declara su fontanería no autentica a nadie. No es un error
+    // de autoría —el enganche con la periferia es opcional (decisión 0017)— pero
+    // tampoco sirve aquí, y decirlo al arrancar es mejor que dejar que el primer
+    // cliente se estrelle contra `issuer_unknown`.
+    if (!outside.usableIssuers.includes(issuerId)) {
+      throw new UsageError(
+        `\`--issuer ${issuerId}\` no declara con qué autenticar: un emisor \`static-key\` necesita ` +
+          '`subject` y `secret`, y uno `oidc` necesita `discovery`. ' +
+          `Los que sí sirven: ${outside.usableIssuers.length === 0 ? 'ninguno' : outside.usableIssuers.join(', ')}.`,
+      );
+    }
+
+    return await atiende(loaded, outside, parada, {
+      issuerId,
+      keyEnv,
+      http: values.http === true,
+      host: values.host ?? DEFAULT_HOST,
+      puerto,
+      maxBody,
+      ...(values['key-header'] === undefined ? {} : { header: values['key-header'] }),
+    });
+  } finally {
+    // Un arranque que falla a medias —descubrimiento contra un upstream caído,
+    // puerto ocupado, bóveda mal declarada— tiene que **salir**, no quedarse
+    // colgado con un hijo vivo y un código de salida que nunca se entrega.
+    parada.desarma();
     await catalog?.close();
-    throw new UsageError(
-      `\`--issuer ${issuerId}\` no declara con qué autenticar: un emisor \`static-key\` necesita ` +
-        '`subject` y `secret`, y uno `oidc` necesita `discovery`. ' +
-        `Los que sí sirven: ${outside.usableIssuers.length === 0 ? 'ninguno' : outside.usableIssuers.join(', ')}.`,
-    );
+    await outside?.close();
   }
+}
 
+interface Escucha {
+  readonly issuerId: string;
+  readonly keyEnv: string;
+  readonly http: boolean;
+  readonly host: string;
+  readonly puerto: number;
+  readonly maxBody: number;
+  readonly header?: string;
+}
+
+async function atiende(
+  loaded: LoadedPolicy,
+  outside: Periphery,
+  parada: Parada,
+  escucha: Escucha,
+): Promise<number> {
   const ports: GatewayPorts = {
     principals: outside.principals satisfies PrincipalResolver,
     usageReader: outside.usageReader satisfies UsageReader,
@@ -353,22 +545,24 @@ async function serve(artifactPath: string, values: ServeValues): Promise<number>
     },
   };
 
-  const info = { name: 'mcpizer', version: '0.0.0' };
+  const info = { name: 'mcpizer', version: selfVersion() };
   let running: RunningServer;
 
-  if (values.http === true) {
-    const port = values.port === undefined ? 0 : Number(values.port);
-    if (!Number.isInteger(port) || port < 0 || port > 65_535) {
-      throw new UsageError(`\`--port ${String(values.port)}\` no es un puerto.`);
-    }
+  if (escucha.http) {
     const http = await mcpHttpServer(info, handlers, {
-      issuer: issuerId,
-      port,
-      ...(values['key-header'] === undefined ? {} : { header: values['key-header'] }),
+      issuer: escucha.issuerId,
+      port: escucha.puerto,
+      host: escucha.host,
+      health: healthReport(info.version, loaded.artifact.version),
+      maxBody: escucha.maxBody,
+      ...(escucha.header === undefined ? {} : { header: escucha.header }),
     });
     // Por HTTP el proceso no termina cuando un cliente se va: los clientes van y
     // vienen. Lo dice al arrancar y se queda escuchando.
-    process.stderr.write(`mcpizer escucha en http://127.0.0.1:${http.port}/mcp\n`);
+    process.stderr.write(
+      `mcpizer ${info.version} escucha en http://${http.host}:${http.port}/mcp ` +
+        `(sonda en ${HEALTH_PATH}); política ${loaded.artifact.version}\n`,
+    );
     running = http;
   } else {
     /**
@@ -377,14 +571,20 @@ async function serve(artifactPath: string, values: ServeValues): Promise<number>
      * se guarda en ninguna parte.
      */
     running = await mcpStdioServer(info, handlers, () => ({
-      issuer: issuerId,
-      presented: process.env[keyEnv] ?? '',
+      issuer: escucha.issuerId,
+      presented: process.env[escucha.keyEnv] ?? '',
     }));
+    // Por stdio no hay sonda que valga: el cliente *es* quien arrancó el
+    // proceso, y su salud es que el proceso siga vivo. Se anuncia por stderr
+    // porque stdout es el protocolo (decisión 0019).
+    process.stderr.write(`mcpizer ${info.version} atiende por stdio; política ${loaded.artifact.version}\n`);
   }
 
+  parada.atiende(() => {
+    void running.close();
+  });
+
   await running.closed;
-  await outside.close();
-  await catalog?.close();
   return 0;
 }
 
@@ -407,6 +607,13 @@ async function run(argv: readonly string[]): Promise<number> {
 
   if (command === 'schema') {
     printJson(schema);
+    return 0;
+  }
+
+  if (command === 'version') {
+    const version = selfVersion();
+    if (values.json) printJson({ mcpizer: version, node: process.version });
+    else print([`mcpizer ${version}`, `node ${process.version}`]);
     return 0;
   }
 

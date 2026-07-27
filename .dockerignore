@@ -1,0 +1,9 @@
+# Lo que la imagen no necesita para construir el artefacto. `node_modules/` es
+# además dañino: traería el árbol del anfitrión, con sus binarios y su
+# plataforma, en vez del que resuelve el fichero de bloqueo dentro.
+node_modules/
+dist/
+*.tsbuildinfo
+.eslintcache
+.git/
+.github/

@@ -2,8 +2,9 @@
  * `CredentialResolver` sobre variables de entorno.
  *
  * Es el mínimo para desarrollo y la más simple de las cuatro implementaciones
- * previstas; Vault, el gestor de secretos del proveedor cloud y el almacén de
- * tokens OAuth llegan en S3 (`docs/diseno/puertos.md` §2.5).
+ * previstas. Vault ya está, en `vault-credentials.ts`; el gestor de secretos del
+ * proveedor cloud y el almacén de tokens OAuth siguen previstos y sin escribir
+ * (`docs/diseno/puertos.md` §2.5).
  *
  * Esta es la frontera que hace cierto el invariante 6. Todo lo canjeable del
  * sistema nace aquí y muere en `ToolInvoker`: no vuelve hacia el núcleo bajo

@@ -2,8 +2,8 @@
  * `ToolInvoker` como cliente MCP por stdio.
  *
  * Es uno de los dos transportes del propio protocolo, así que la variación
- * existe desde el primer día; el cliente por HTTP streamable llega en S3
- * (`docs/diseno/puertos.md` §2.6).
+ * existe desde el primer día; el cliente por HTTP streamable es el de al lado,
+ * en `mcp-http-invoker.ts` (`docs/diseno/puertos.md` §2.6).
  *
  * **No reinterpreta la decisión.** Si una llamada llega aquí, está autorizada:
  * este adaptador no vuelve a comprobar la política y tampoco la relaja. Es el

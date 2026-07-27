@@ -4,15 +4,17 @@
  * Implementa los contratos de puerto que declara `runtime/`. No importa ningún
  * contexto: la traducción entre vocabularios ocurre en composición.
  *
- * Hay **una implementación por puerto, la más simple de cada uno**. Es
- * deliberado: S2 cierra el camino completo, no la variación. La segunda
- * implementación de cada frontera —OIDC, git, MCP sobre HTTP, Vault, Redis,
- * OpenTelemetry— es S3, y es donde se sabrá si algún contrato estaba mal
- * planteado.
+ * Hay **al menos dos implementaciones por puerto**, y ninguna de las segundas
+ * —OIDC, git, MCP sobre HTTP, Vault, Redis, OpenTelemetry— obligó a cambiar un
+ * contrato. Era lo que el invariante 9 prometía y lo que S3 existía para poner a
+ * prueba: la variación se absorbe en la frontera, no en el modelo.
  *
- * `mcp-stdio-server.ts` es la excepción de forma: no implementa ningún puerto,
- * porque es un adaptador de **entrada**. Consume la orquestación en vez de
- * servirla.
+ * Qué implementación atiende a cada emisor, upstream y cuenta lo despacha
+ * `periphery.ts`, y lo dice el propio artefacto (decisión 0022).
+ *
+ * Los dos servidores MCP son la excepción de forma: no implementan ningún
+ * puerto, porque son adaptadores de **entrada**. Consumen la orquestación en vez
+ * de servirla.
  */
 export { policyFile, type LoadedArtifact } from './policy-file.js';
 export { policyGit, parseGitOrigin, type GitOrigin } from './policy-git.js';
@@ -34,7 +36,13 @@ export {
   type RunningServer,
 } from './mcp-server.js';
 export { mcpStdioServer } from './mcp-stdio-server.js';
-export { mcpHttpServer, type HttpServerOptions, type RunningHttpServer } from './mcp-http-server.js';
+export {
+  DEFAULT_MAX_BODY,
+  HEALTH_PATH,
+  mcpHttpServer,
+  type HttpServerOptions,
+  type RunningHttpServer,
+} from './mcp-http-server.js';
 export { otlpRecorder, type OtlpOptions, type OtlpRecorder } from './otlp-recorder.js';
 export {
   catalogFor,

@@ -34,12 +34,38 @@ export interface HttpServerOptions {
   readonly path?: string;
   /** De qué cabecera se toma la credencial. `Authorization` acepta el prefijo `Bearer`. */
   readonly header?: string;
+  /**
+   * Qué contesta `/health`.
+   *
+   * Es lo único que este servidor atiende sin credencial, y por eso lo compone
+   * quien arranca el proceso y no este adaptador: una sonda la interroga un
+   * orquestador anónimo, así que todo lo que aparezca aquí es público. Sin este
+   * campo no hay endpoint de salud, que es lo correcto cuando nadie sondea.
+   */
+  readonly health?: () => Readonly<Record<string, unknown>>;
+  /**
+   * Cuánto cuerpo se acepta en una petición, en bytes.
+   *
+   * Sin techo, cualquiera que alcance el puerto puede agotar la memoria del
+   * proceso antes de que nadie haya decidido si tiene permiso para algo: la
+   * denegación llega después de haber leído lo que se envió. Es la deuda que la
+   * decisión 0027 dejó anotada para el empaquetado.
+   */
+  readonly maxBody?: number;
 }
+
+/** Un mensaje JSON-RPC de MCP no se parece a una subida de fichero. */
+export const DEFAULT_MAX_BODY = 1024 * 1024;
 
 export interface RunningHttpServer extends RunningServer {
   /** El puerto real: con `port: 0` lo elige el sistema, y hace falta saberlo. */
   readonly port: number;
+  /** La interfaz en la que se escucha. En un contenedor no puede ser la de bucle. */
+  readonly host: string;
 }
+
+/** La ruta de la sonda. Fija: un orquestador la configura en su lado, no en el nuestro. */
+export const HEALTH_PATH = '/health';
 
 /**
  * Lo presentado, extraído de la cabecera.
@@ -55,6 +81,38 @@ function presented(request: IncomingMessage, header: string): string {
   return value.startsWith('Bearer ') ? value.slice('Bearer '.length) : value;
 }
 
+/**
+ * El techo de tamaño, comprobado antes de leer un solo byte del cuerpo.
+ *
+ * Se exige `Content-Length` en vez de contar lo que llega: contar obligaría a
+ * consumir el flujo que el transporte necesita íntegro, y un contador que
+ * interfiere con la lectura es peor que no tener techo. La contrapartida es que
+ * un cuerpo troceado sin longitud se rechaza — ningún cliente MCP los manda, y
+ * aceptarlos sería dejar abierta justo la vía que este techo cierra.
+ */
+function demasiadoGrande(
+  request: IncomingMessage,
+  maxBody: number,
+): { status: number; mensaje: string } | undefined {
+  // Sin cuerpo no hay nada que medir: `GET` abre el flujo de vuelta y `DELETE`
+  // cierra la sesión.
+  if (request.method !== 'POST') return undefined;
+
+  const declared = request.headers['content-length'];
+  if (declared === undefined) {
+    return { status: 411, mensaje: 'Una petición con cuerpo tiene que declarar `Content-Length`.' };
+  }
+
+  const length = Number(declared);
+  if (!Number.isInteger(length) || length < 0) {
+    return { status: 400, mensaje: '`Content-Length` no es un número de bytes.' };
+  }
+  if (length > maxBody) {
+    return { status: 413, mensaje: `El cuerpo excede el máximo de ${maxBody} bytes.` };
+  }
+  return undefined;
+}
+
 export async function mcpHttpServer(
   info: { readonly name: string; readonly version: string },
   handlers: GatewayHandlers,
@@ -62,14 +120,40 @@ export async function mcpHttpServer(
 ): Promise<RunningHttpServer> {
   const path = options.path ?? '/mcp';
   const header = options.header ?? 'Authorization';
+  const maxBody = options.maxBody ?? DEFAULT_MAX_BODY;
 
   const abiertas = new Set<{ close(): Promise<void> }>();
 
   const atiende = async (request: IncomingMessage, response: ServerResponse): Promise<void> => {
     const url = new URL(request.url ?? '/', `http://${request.headers.host ?? 'localhost'}`);
+
+    // La sonda va antes que el endpoint MCP y **sin credencial**: quien la
+    // interroga es un orquestador que no tiene ninguna, y exigirle una
+    // convertiría un proceso sano en uno que se reinicia en bucle.
+    if (options.health !== undefined && url.pathname === HEALTH_PATH) {
+      // Solo se lee. Contestar a cualquier verbo sería superficie que nadie ha
+      // diseñado, en el único sitio del servidor al que se llega sin credencial.
+      if (request.method !== 'GET' && request.method !== 'HEAD') {
+        response.writeHead(405, { 'content-type': 'application/json', allow: 'GET, HEAD' });
+        response.end(JSON.stringify({ error: 'La sonda solo se lee.' }));
+        return;
+      }
+      const body = JSON.stringify(options.health());
+      response.writeHead(200, { 'content-type': 'application/json' });
+      response.end(request.method === 'HEAD' ? undefined : body);
+      return;
+    }
+
     if (url.pathname !== path) {
       response.writeHead(404, { 'content-type': 'application/json' });
       response.end(JSON.stringify({ error: `El endpoint MCP de este servidor es \`${path}\`.` }));
+      return;
+    }
+
+    const rechazo = demasiadoGrande(request, maxBody);
+    if (rechazo !== undefined) {
+      response.writeHead(rechazo.status, { 'content-type': 'application/json' });
+      response.end(JSON.stringify({ error: rechazo.mensaje }));
       return;
     }
 
@@ -112,9 +196,11 @@ export async function mcpHttpServer(
     });
   });
 
+  const host = options.host ?? '127.0.0.1';
+
   await new Promise<void>((resolve, reject) => {
     http.once('error', reject);
-    http.listen(options.port ?? 0, options.host ?? '127.0.0.1', () => {
+    http.listen(options.port ?? 0, host, () => {
       http.removeListener('error', reject);
       resolve();
     });
@@ -130,10 +216,21 @@ export async function mcpHttpServer(
 
   return {
     port,
+    host,
     closed,
     async close(): Promise<void> {
       await Promise.all([...abiertas].map((cerrable) => cerrable.close()));
       abiertas.clear();
+      // `close()` deja de aceptar y espera a que **todas** las conexiones
+      // abiertas terminen, y ahí es donde un cierre ordenado se cuelga para
+      // siempre: basta un socket aceptado que no ha pedido nada —una sonda TCP
+      // de un balanceador, un escaneo de puertos, un cliente que abre y calla—
+      // para que ese `close()` no complete nunca. No es ocioso, así que
+      // `closeIdleConnections()` no lo toca.
+      //
+      // Se cierran todas. Las peticiones en vuelo ya se han cerrado justo
+      // arriba, una a una, así que aquí no queda trabajo que interrumpir.
+      http.closeAllConnections();
       await new Promise<void>((resolve) => http.close(() => resolve()));
       resolveClosed();
     },

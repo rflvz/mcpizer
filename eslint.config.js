@@ -17,11 +17,13 @@ export default tseslint.config(
     },
   },
   {
-    // La cáscara y el arnés de verificación sí viven sobre una plataforma.
+    // La cáscara, el arnés de verificación y el empaquetado sí viven sobre una
+    // plataforma.
     files: [
       '*.js',
       '*.ts',
       'verification/**/*.{js,ts}',
+      'deployment/**/*.js',
       ...PERIPHERY.flatMap((pkg) => [`${pkg}/src/**/*.ts`, `${pkg}/test/**/*.ts`]),
     ],
     languageOptions: { globals: globals.node },
