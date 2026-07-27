@@ -168,15 +168,19 @@ Cachear catálogos o resoluciones de credencial es una preocupación de rendimie
 
 | Puerto | Momento | Implementaciones previstas | ¿≥2? |
 |---|---|---|---|
-| `PrincipalResolver` | entrada | **OIDC/JWT** · mTLS · **clave estática** | 3 ✓ |
-| `PolicySource` | entrada | **fichero** · **git** · HTTP/ConfigMap | 3 ✓ |
+| `PrincipalResolver` | entrada | **OIDC/JWT** · **mTLS** · **clave estática** | 3 ✓ |
+| `PolicySource` | entrada | **fichero** · **git** · **HTTP/ConfigMap** | 3 ✓ |
 | `CatalogSource` | entrada | **MCP stdio** · **MCP HTTP** · **catálogo estático** | 3 ✓ |
 | `UsageReader` / `UsageWriter` | entrada / salida | **memoria** · **Redis** | 2 ✓ |
-| `CredentialResolver` | salida | **entorno** · **Vault** · gestor cloud · tokens OAuth | 4 ✓ |
+| `CredentialResolver` | salida | **entorno** · **Vault** · **gestor cloud** · **tokens OAuth** | 4 ✓ |
 | `ToolInvoker` | salida | **MCP stdio** · **MCP HTTP** | 2 ✓ |
-| `DecisionRecorder` | salida | **JSON al registro** · **OpenTelemetry** · fichero auditado | 3 ✓ |
+| `DecisionRecorder` | salida | **JSON al registro** · **OpenTelemetry** · **fichero auditado** | 3 ✓ |
 
-En negrita, lo que existe: S2 dejó una por puerto y S3 la segunda. Lo demás sigue previsto y sin escribir — mTLS, HTTP/ConfigMap, el gestor de secretos del proveedor cloud, el almacén de tokens OAuth con refresco y el fichero de auditoría con rotación. **S4 no escribió ninguna**: empaquetar y operar no necesitó frontera nueva, que es la mejor noticia que podía dar sobre las siete que ya había.
+En negrita, lo que existe — que ya es **todo**. S2 dejó una implementación por puerto, S3 la segunda, S4 no escribió ninguna porque empaquetar y operar no necesitó frontera nueva, y la última tanda cerró las cinco que quedaban previstas: mTLS, HTTP, el gestor de secretos del proveedor cloud, el almacén de tokens OAuth con refresco y el fichero de auditoría con rotación.
+
+Lo que importa de eso no es el recuento. Es que **ninguno de los siete contratos ha cambiado en el camino**, ni con la segunda implementación ni con la cuarta: `runtime/src/ports.ts` es el mismo, y su retrato versionado lo demuestra. Un puerto que aguanta cuatro implementaciones con modos de fallo tan distintos como los de una variable de entorno y los de un token que caduca estaba bien planteado.
+
+Las que un despliegue concreto añada a partir de aquí —otro proveedor de nube, otro almacén de contadores— caben en las mismas fronteras. Que ya no queden implementaciones *previstas* no significa que no vaya a haber más: significa que las que había previstas ya no son una promesa.
 
 Ninguno de los siete contratos ha cambiado al llegar la segunda implementación. Es lo que el invariante 9 prometía y lo que [`../sesiones.md`](../sesiones.md) §5 puso a prueba: la variación se absorbe en la frontera, no en el modelo. Lo que sí apareció está registrado — el ciclo de vida que ningún puerto declara ([0023](../decisiones/0023-el-ciclo-de-vida-vive-en-el-compositor.md)) y el descubrimiento que no tiene por dónde llevar una credencial ([0025](../decisiones/0025-el-descubrimiento-mcp-no-autentica.md)).
 

@@ -10,17 +10,19 @@ Las dos identidades nunca son la misma cosa. **Quién invoca** es el principal: 
 
 **Las cuatro sesiones, completadas.** La última empaqueta: hay un artefacto desplegable que se construye y arranca desde cero, sin este repositorio y sin red.
 
-Y antes de eso, la periferia real: cada puerto tiene al menos **dos** implementaciones, intercambiables sin tocar el núcleo ni la orquestación.
+Y la periferia está completa: cada puerto tiene entre **dos y cuatro** implementaciones, intercambiables sin tocar el núcleo ni la orquestación, y ninguna de las que el diseño preveía sigue sin escribir.
 
-| Puerto | Lo mínimo | Lo real |
+| Puerto | Lo mínimo | Y además |
 |---|---|---|
-| ¿quién invoca? | clave estática | **OIDC/JWT** con validación por JWKS |
-| ¿de dónde sale la política? | fichero | **git** a una referencia fija |
+| ¿quién invoca? | clave estática | **OIDC/JWT** por JWKS · **mTLS** por nombre distinguido |
+| ¿de dónde sale la política? | fichero | **git** a una referencia fija · **HTTPS** |
 | ¿qué tools hay? | catálogo declarado | **descubrimiento MCP** (`tools/list`) |
 | ¿cuánto se ha usado? | memoria del proceso | **Redis** |
-| ¿de dónde sale la credencial? | variable de entorno | **HashiCorp Vault** |
+| ¿de dónde sale la credencial? | variable de entorno | **Vault** · **gestor de secretos cloud** · **OAuth** con refresco |
 | ¿cómo se invoca? | MCP por stdio | **MCP por HTTP** streamable |
-| ¿dónde va la auditoría? | JSON a stderr | **OpenTelemetry** por OTLP |
+| ¿dónde va la auditoría? | JSON a stderr | **OpenTelemetry** por OTLP · **fichero con rotación** |
+
+Ninguna de esas implementaciones obligó a cambiar un contrato de puerto — ni la segunda ni la cuarta. `runtime/src/ports.ts` es el mismo que en la sesión 2, y su retrato versionado lo demuestra.
 
 Y la pasarela habla los dos transportes también **de cara al cliente**: por stdio la clave llega por entorno, y por HTTP por cabecera y por petición, que es lo que permite que dos identidades compartan puerto.
 
@@ -57,6 +59,16 @@ mcpizer diff antes.yaml despues.yaml
 Una denegación no dice solo que no: dice el código del motivo y el sitio exacto del artefacto que hay que tocar, como `examples/policy.yaml:90:5`. Ese es el bucle de corrección — se pregunta, se corrige, se vuelve a preguntar, sin desplegar y sin adivinar.
 
 El JSON Schema del artefacto se emite con `mcpizer schema`, para editores y validadores externos, y `mcpizer version` dice qué build está corriendo — la primera pregunta de cualquier incidencia.
+
+Todo lo anterior funciona sin red. El catálogo con el que funciona sale de preguntárselo una vez a los upstreams reales:
+
+```bash
+# El único comando que toca la red además de `serve`. Se ejecuta una vez, su
+# salida se versiona junto a la política, y a partir de ahí se vuelve al seco.
+mcpizer catalog examples/policy.yaml > examples/catalog.yaml
+```
+
+Un upstream que no responde aborta la generación en vez de escribir un catálogo al que le faltan tools: ese fichero parecería completo y sería una revocación silenciosa el día que alguien lo usara para verificar.
 
 ## La pasarela
 

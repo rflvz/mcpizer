@@ -1,6 +1,8 @@
 # 0036 — Lo que S4 no cierra, y por qué
 
-**Estado**: Vigente
+**Estado**: **Sustituida en parte** por [0039](0039-el-generador-del-catalogo-declarado.md) y [0040](0040-se-escriben-las-implementaciones-previstas.md). Las dos deudas que esta decisión dejaba abiertas —el generador del catálogo declarado y las implementaciones de puerto previstas— están escritas. Sigue vigente lo que dice sobre la decisión [0029](0029-discovery-y-audience-salen-del-documento.md), que se revisó y no aplicaba.
+
+Se conserva sin editar el cuerpo, porque saber qué se creyó y por qué dejó de creerse vale más que un fichero limpio. Lo que cambió no fue el razonamiento: fue que se pidió cerrar el producto entero, y eso es una decisión de producto que este registro no puede tomar por su cuenta.
 
 ## Contexto
 

@@ -183,7 +183,9 @@ La superficie que hace real el invariante 8. Todo funciona sin red, sin credenci
 
 ### El catálogo estático
 
-Validar el mapeo tool→capacidad requiere saber qué tools existen, y preguntárselo a los upstreams rompería la propiedad. Por eso `CatalogSource` tiene una implementación de catálogo declarado ([`puertos.md`](puertos.md) §2.3): un fichero de descriptores, generable desde los upstreams reales y versionable junto a la política.
+Validar el mapeo tool→capacidad requiere saber qué tools existen, y preguntárselo a los upstreams rompería la propiedad. Por eso `CatalogSource` tiene una implementación de catálogo declarado ([`puertos.md`](puertos.md) §2.3): un fichero de descriptores, **generado** desde los upstreams reales y versionable junto a la política.
+
+Esa generación es el único momento del ciclo que toca la red, y por eso es un paso aparte: se ejecuta una vez contra los upstreams, su salida se versiona, y a partir de ahí todo lo demás vuelve a evaluarse sin red. Un catálogo al que le faltan las tools de un upstream que no contestó sería una revocación silenciosa el día que ese fichero se usara para verificar, así que un upstream caído aborta la generación en vez de producir un fichero incompleto ([0039](../decisiones/0039-el-generador-del-catalogo-declarado.md)).
 
 Con él, la verificación en seco detecta también lo que de otro modo solo aparecería en ejecución: mapeos a tools que ya no existen, y tools nuevas que ningún mapeo cubre — que son invisibles por fallo cerrado, correctamente, pero cuya aparición conviene señalar.
 
@@ -202,3 +204,18 @@ Con él, la verificación en seco detecta también lo que de otro modo solo apar
 | Quién invoca y con qué cuenta se actúa son campos distintos (`to` / `using`) | 5 |
 | La política se evalúa entera sin red; del enganche solo se comprueba integridad referencial | 8 |
 | Todo diagnóstico y todo motivo señalan una posición del documento | 4 |
+
+### Los esquemas de referencia, y por qué siguen siendo referencias
+
+`secret.ref` admite cuatro esquemas, y ninguno rompe la segunda regla de la tabla:
+
+| Esquema | Qué nombra |
+|---|---|
+| `env://VARIABLE` | Una variable del entorno del proceso |
+| `vault://<montaje>/<ruta>[#<campo>]` | Un secreto de la bóveda |
+| `gcp-secrets://projects/<p>/secrets/<s>[/versions/<v>]` | Un secreto del gestor de la nube |
+| `oauth+<url>?client=…&secret=…[&scope=…]` | Un token que se **acuña** contra ese emisor |
+
+El cuarto es el que más cerca pasa de la regla, y por eso el secreto del cliente no está en la referencia: la referencia nombra **otra referencia**, y esa la resuelve el mismo despachador. Así el artefacto sigue sin contener nada canjeable, y el secreto del cliente puede vivir en la bóveda como cualquier otro.
+
+Un emisor puede además declararse `kind: mtls`, y entonces sus atributos salen de componentes del nombre distinguido del certificado (`dn:O`, `dn:OU`) igual que los de uno `oidc` salen de claims. Quién verifica la cadena es el terminador TLS, no este proceso: declararlo en el artefacto **es** la decisión de confiar en lo que ese terminador reenvía ([0037](../decisiones/0037-la-identidad-de-certificado-la-verifica-el-terminador.md)).
