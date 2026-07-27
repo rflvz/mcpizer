@@ -45,3 +45,11 @@ Las decisiones no se borran ni se editan cuando cambian: se registra una nueva q
 | [0019](0019-el-registro-va-a-stderr.md) | El registro de decisiones va a stderr, porque stdout es el protocolo | Vigente |
 | [0020](0020-una-sesion-por-upstream-y-cuenta.md) | Una sesión de upstream por `(upstream, cuenta)` | Vigente |
 | [0021](0021-el-catalogo-declarado-basta-en-s2.md) | S2 no añade descubrimiento MCP al `CatalogSource` | Vigente |
+| [0022](0022-donde-se-elige-la-implementacion-de-cada-puerto.md) | El artefacto elige la periferia por elemento; el arranque elige la del proceso | Vigente |
+| [0023](0023-el-ciclo-de-vida-vive-en-el-compositor.md) | El ciclo de vida de la periferia vive en un compositor, no en los puertos | Vigente |
+| [0024](0024-claims-multivaluados.md) | Un claim multivaluado no produce atributo | Vigente |
+| [0025](0025-el-descubrimiento-mcp-no-autentica.md) | El descubrimiento MCP ocurre una vez al arrancar, y sin credencial | Vigente |
+| [0026](0026-jose-si-cliente-de-redis-y-sdk-de-otel-no.md) | `jose` sí; cliente de Redis y SDK de OpenTelemetry, no | Vigente |
+| [0027](0027-la-credencial-del-cliente-llega-por-peticion.md) | Con HTTP la credencial del cliente llega por cabecera y por petición | Vigente |
+| [0028](0028-policy-source-sobre-git.md) | `PolicySource` sobre git: la versión es el sha, y se lee sin copia de trabajo | Vigente |
+| [0029](0029-discovery-y-audience-salen-del-documento.md) | `discovery` y `audience` los lee la cáscara del documento | Vigente |

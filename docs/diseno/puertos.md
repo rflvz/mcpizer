@@ -152,12 +152,16 @@ Cachear catálogos o resoluciones de credencial es una preocupación de rendimie
 
 | Puerto | Momento | Implementaciones previstas | ¿≥2? |
 |---|---|---|---|
-| `PrincipalResolver` | entrada | OIDC/JWT · mTLS · clave estática | 3 ✓ |
-| `PolicySource` | entrada | fichero · git · HTTP/ConfigMap | 3 ✓ |
-| `CatalogSource` | entrada | MCP stdio · MCP HTTP · catálogo estático | 3 ✓ |
-| `UsageReader` / `UsageWriter` | entrada / salida | memoria · Redis | 2 ✓ |
-| `CredentialResolver` | salida | entorno · Vault · gestor cloud · tokens OAuth | 4 ✓ |
-| `ToolInvoker` | salida | MCP stdio · MCP HTTP | 2 ✓ |
-| `DecisionRecorder` | salida | stdout JSON · OpenTelemetry · fichero auditado | 3 ✓ |
+| `PrincipalResolver` | entrada | **OIDC/JWT** · mTLS · **clave estática** | 3 ✓ |
+| `PolicySource` | entrada | **fichero** · **git** · HTTP/ConfigMap | 3 ✓ |
+| `CatalogSource` | entrada | **MCP stdio** · **MCP HTTP** · **catálogo estático** | 3 ✓ |
+| `UsageReader` / `UsageWriter` | entrada / salida | **memoria** · **Redis** | 2 ✓ |
+| `CredentialResolver` | salida | **entorno** · **Vault** · gestor cloud · tokens OAuth | 4 ✓ |
+| `ToolInvoker` | salida | **MCP stdio** · **MCP HTTP** | 2 ✓ |
+| `DecisionRecorder` | salida | **stdout JSON** · **OpenTelemetry** · fichero auditado | 3 ✓ |
+
+En negrita, lo que existe: S2 dejó una por puerto y S3 la segunda. Lo demás sigue previsto y sin escribir — mTLS, HTTP/ConfigMap, el gestor de secretos del proveedor cloud, el almacén de tokens OAuth con refresco y el fichero de auditoría con rotación.
+
+Ninguno de los siete contratos ha cambiado al llegar la segunda implementación. Es lo que el invariante 9 prometía y lo que [`../sesiones.md`](../sesiones.md) §5 puso a prueba: la variación se absorbe en la frontera, no en el modelo. Lo que sí apareció está registrado — el ciclo de vida que ningún puerto declara ([0023](../decisiones/0023-el-ciclo-de-vida-vive-en-el-compositor.md)) y el descubrimiento que no tiene por dónde llevar una credencial ([0025](../decisiones/0025-el-descubrimiento-mcp-no-autentica.md)).
 
 Declinados con motivo: `Clock`, aleatoriedad, repositorio genérico, unidad de trabajo, `ToolNameResolver`, caché.
