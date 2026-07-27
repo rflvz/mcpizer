@@ -38,3 +38,10 @@ Las decisiones no se borran ni se editan cuando cambian: se registra una nueva q
 | [0012](0012-path-como-puntero-resoluble.md) | `path` es un puntero RFC 6901 resoluble a línea y columna | Vigente |
 | [0013](0013-combinacion-de-techos.md) | El techo más restrictivo se compara por ritmo | Vigente |
 | [0014](0014-uso-por-defecto-en-seco.md) | En seco, el uso por defecto es cero, y el listado no lo consulta | Vigente |
+| [0015](0015-donde-vive-la-pasarela.md) | La pasarela se orquesta en `runtime/`; el protocolo MCP vive en `adapters/` | Vigente |
+| [0016](0016-nombre-expuesto-de-una-tool.md) | El nombre expuesto de una tool es `upstream__tool`, siempre | Vigente |
+| [0017](0017-clave-estatica-en-el-artefacto.md) | El emisor `static-key` declara sujeto y referencia a la clave | Vigente |
+| [0018](0018-fallos-que-access-no-ve.md) | Los fallos que `access` no ve envuelven la decisión; no amplían `ReasonCode` | Vigente |
+| [0019](0019-el-registro-va-a-stderr.md) | El registro de decisiones va a stderr, porque stdout es el protocolo | Vigente |
+| [0020](0020-una-sesion-por-upstream-y-cuenta.md) | Una sesión de upstream por `(upstream, cuenta)` | Vigente |
+| [0021](0021-el-catalogo-declarado-basta-en-s2.md) | S2 no añade descubrimiento MCP al `CatalogSource` | Vigente |

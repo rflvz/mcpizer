@@ -9,12 +9,20 @@ import type { Decision, ReasonCode } from '@mcpizer/access';
 import type { Diagnostic, DocumentPosition } from '@mcpizer/policy';
 import type { AuthenticationProblem } from '@mcpizer/principals';
 import type { DecisionChange, Explanation, ReachReport } from '../dry-run.js';
+import type { CallOutcome } from '../gateway.js';
 
 export function at(origin: string, position: DocumentPosition | undefined): string {
   return position === undefined ? origin : `${origin}:${position.line}:${position.column}`;
 }
 
-const REASONS: Readonly<Record<ReasonCode, string>> = {
+/**
+ * La prosa de cada motivo, en un solo sitio.
+ *
+ * La pasarela la comparte con `explain`: que la denegación que recibe un cliente
+ * MCP y la que imprime la verificación en seco digan lo mismo es lo que hace que
+ * el bucle de corrección funcione igual desde los dos lados.
+ */
+export const REASONS: Readonly<Record<ReasonCode, string>> = {
   granted: 'una concesión lo cubre',
   capability_not_declared: 'la capacidad no está declarada',
   capability_not_realized: 'ninguna tool declarada realiza la capacidad',
@@ -25,7 +33,7 @@ const REASONS: Readonly<Record<ReasonCode, string>> = {
   limit_exhausted: 'el techo de la concesión está agotado',
 };
 
-const PROBLEMS: Readonly<Record<AuthenticationProblem, string>> = {
+export const PROBLEMS: Readonly<Record<AuthenticationProblem, string>> = {
   credential_missing: 'no llega ninguna identidad',
   credential_invalid: 'la credencial no es válida',
   credential_expired: 'la credencial ha caducado',
@@ -44,6 +52,41 @@ export function renderDiagnostics(origin: string, diagnostics: readonly Diagnost
     lines.push('');
   }
   return lines;
+}
+
+/**
+ * Lo que un cliente MCP lee cuando su invocación no se ejecuta.
+ *
+ * Cada caso dice **qué pasó y dónde tocar**, que es el invariante 4 llevado
+ * hasta el borde: quien configura el sistema recibe la denegación con el sitio
+ * exacto y no tiene que adivinar. Y los casos se mantienen distinguibles —una
+ * denegación de política no se parece a un proveedor caído— porque confundirlos
+ * haría inútil ese bucle.
+ */
+export function renderCallOutcome(origin: string, outcome: CallOutcome): string {
+  switch (outcome.kind) {
+    case 'invoked':
+      return '';
+    case 'unauthenticated':
+      return `mcpizer: sin principal — ${outcome.problem}: ${PROBLEMS[outcome.problem]}.`;
+    case 'unknown-tool':
+      return (
+        `mcpizer: \`${outcome.name}\` no es ninguna tool declarada. ` +
+        'Lo no declarado no se expone, así que tampoco se invoca.'
+      );
+    case 'denied':
+      return (
+        `mcpizer: denegado — ${outcome.reason.code}: ${REASONS[outcome.reason.code]}.\n` +
+        `El sitio a tocar es ${at(origin, outcome.position)} (${outcome.reason.path}).`
+      );
+    case 'credential-failed':
+      return (
+        `mcpizer: la cuenta \`${outcome.account}\` estaba autorizada y su credencial no se pudo resolver: ` +
+        `${outcome.detail}. No se ejecuta nada sin credencial.`
+      );
+    case 'upstream-failed':
+      return `mcpizer: el upstream \`${outcome.upstreamId}\` falló: ${outcome.detail}. No es una denegación de política.`;
+  }
 }
 
 function renderDecision(origin: string, decision: Decision, position: DocumentPosition | undefined): string[] {
