@@ -6,7 +6,8 @@
  * del cliente. "JSON estructurado a stdout" de `docs/diseno/puertos.md` §2.7 se
  * lee aquí como "a la salida de diagnóstico del proceso".
  *
- * OpenTelemetry y el fichero de auditoría con rotación llegan en S3.
+ * OpenTelemetry ya está, en `otlp-recorder.ts`. El fichero de auditoría con
+ * rotación sigue previsto y sin escribir.
  */
 
 interface Record_ {

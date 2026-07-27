@@ -2,7 +2,7 @@
 
 Documento complementario al plan de proyecto. Fija el enfoque arquitectónico y los criterios bajo los que se evaluará cualquier implementación.
 
-Estado: enfoque cerrado. Diseño detallado pendiente, deliberadamente.
+Estado: enfoque cerrado. El diseño detallado que la sección 6 dejó abierto está en [`diseno/`](diseno/), y las cuatro sesiones de [`sesiones.md`](sesiones.md) han terminado. Nada de lo que sigue ha cambiado por ello: este documento es el enfoque, no el estado del trabajo.
 
 ---
 

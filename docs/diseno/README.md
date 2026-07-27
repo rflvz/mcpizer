@@ -19,9 +19,10 @@ Esta tabla es el **mínimo** por tipo de trabajo, no un techo. Las sesiones defi
 | Implementar un adaptador | `puertos.md` |
 | Trabajar en la política, el esquema o la CLI de verificación | `artefacto.md` + `modelo.md` |
 | Cablear la composición | `contextos.md` + `puertos.md` |
+| Empaquetar, desplegar u operar | `entrega.md` + `puertos.md` |
 | Revisar si algo cumple la arquitectura | `verificacion.md` |
 
-Ninguna sesión necesita los cinco. Si una parece necesitarlos, conviene sospechar del troceado de la sesión antes que del documento.
+Ninguna sesión necesita los seis. Si una parece necesitarlos, conviene sospechar del troceado de la sesión antes que del documento.
 
 ---
 
@@ -34,6 +35,7 @@ Ninguna sesión necesita los cinco. Si una parece necesitarlos, conviene sospech
 | [`puertos.md`](puertos.md) | Contrato de cada puerto, sus ≥2 implementaciones previstas, y los puertos declinados con su motivo. |
 | [`artefacto.md`](artefacto.md) | Formato del artefacto declarativo, con ejemplo comentado, y la superficie de verificación en seco. |
 | [`verificacion.md`](verificacion.md) | Cómo cada criterio de la sección 5 se convierte en una comprobación que falla el build. |
+| [`entrega.md`](entrega.md) | Estrategia de pruebas, qué es el artefacto desplegable y el contrato de operación: cómo arranca, cómo para y qué se le puede preguntar. |
 
 ---
 
@@ -57,7 +59,8 @@ Más estricto que lo que pide la sección 3, a propósito. Hace el blast radius 
 Deliberadamente, y por los mismos motivos de la sección 1 de la arquitectura:
 
 - Estructura **interna** de cada contexto.
-- Estrategia de pruebas más allá de lo que exige [`verificacion.md`](verificacion.md), empaquetado y despliegue — es el alcance de la sesión S4.
 - Forma sintáctica concreta de tipos y funciones.
+
+La estrategia de pruebas, el empaquetado y el despliegue ya no están abiertos: los cierra [`entrega.md`](entrega.md), que era el alcance de la sesión S4. Lo que esa sesión dejó fuera a propósito está enumerado en [`entrega.md`](entrega.md) §5 y registrado en [0036](../decisiones/0036-lo-que-s4-no-cierra.md).
 
 La fase de sesiones, que era el "siguiente paso" de la sección 7 de la arquitectura, ya está definida en [`../sesiones.md`](../sesiones.md).

@@ -96,7 +96,11 @@ Es donde el invariante 9 deja de ser una promesa. Si un contrato de puerto estab
 
 Cierra lo que la sección 6 de la arquitectura dejó fuera a propósito.
 
+Cubre: la estrategia de pruebas, el artefacto desplegable y su imagen · el contrato de operación —cómo arranca, cómo para, qué se le puede preguntar y dónde termina el proceso y empieza la plataforma— · la comprobación que lo ejecuta, con sus casos de fallo. Todo ello en [`diseno/entrega.md`](diseno/entrega.md).
+
 **Termina cuando** el artefacto desplegable se construye y arranca desde cero contra una política de ejemplo.
+
+Es la única sesión cuyo criterio no habla del código sino de lo que sale de él. Y es la que pone a prueba lo demás por última vez: si la frontera entre contextos solo existiera en el árbol de trabajo, o si el ciclo de vida no tuviera dueño, aquí se vería — porque hay que empaquetarlo y hay que pararlo.
 
 ---
 

@@ -114,9 +114,11 @@ Registra la decisión y su motivo.
 - **Garantiza**: registra tanto permisos como denegaciones. Registrar solo denegaciones dejaría sin rastro justo el caso que más importa auditar: quién usó qué cuenta. **Nunca recibe material de credencial** — recibe la referencia, que es opaca por diseño.
 - **Falla**: un fallo al registrar no revierte una ejecución ya hecha, pero sí es visible. Que la auditoría falle en silencio es un fallo de seguridad.
 
-**Implementaciones previstas (3)**: JSON estructurado a stdout · OpenTelemetry · fichero de auditoría con rotación.
+**Implementaciones previstas (3)**: JSON estructurado al registro del proceso · OpenTelemetry · fichero de auditoría con rotación.
 
-**Variación real**: stdout es el mínimo para contenedores; OTel aparece en cuanto hay observabilidad centralizada; el fichero de auditoría con retención propia es un requisito de cumplimiento habitual y no se satisface con los otros dos.
+**Variación real**: el registro del proceso es el mínimo para contenedores; OTel aparece en cuanto hay observabilidad centralizada; el fichero de auditoría con retención propia es un requisito de cumplimiento habitual y no se satisface con los otros dos.
+
+*Este documento decía "stdout", y la implementación escribe a **stderr**: con transporte stdio, stdout es el canal JSON-RPC del protocolo y escribir ahí lo rompería. Lo fija la decisión [0019](../decisiones/0019-el-registro-va-a-stderr.md), que es la vigente; el texto se ha corregido para que quien lea solo esta sección no configure la recogida de registros del contenedor mirando el descriptor equivocado.*
 
 ---
 
@@ -142,6 +144,20 @@ El núcleo no persiste. No hay estado de dominio que guardar: la política es en
 
 Es tentador, porque suena a algo que podría venir de fuera. Pero el mapeo **es** el contexto `capabilities`, y sacarlo a un puerto significaría que la traducción que protege el invariante 7 vive fuera del núcleo y puede variar sin verificación. La única variación real es de dónde salen los descriptores, y eso ya lo cubre `CatalogSource`.
 
+### `HealthCheck` — declinado
+
+La sonda de salud es una ruta del adaptador HTTP, y su contenido lo compone la cáscara, que es el único sitio que sabe a la vez qué información existe y cuál de ella es publicable. Un puerto obligaría a los siete adaptadores a declarar salud, y cinco no tienen ninguna que declarar — el mismo argumento con que la decisión [0023](../decisiones/0023-el-ciclo-de-vida-vive-en-el-compositor.md) rechazó poner `close()` en los contratos.
+
+**En su lugar**: [`entrega.md`](entrega.md) §3.3 fija qué puede contestar la sonda y qué tiene prohibido.
+
+### `Config` o fuente de configuración — declinado
+
+La configuración ya tiene contorno decidido y son dos vías, no tres ([0022](../decisiones/0022-donde-se-elige-la-implementacion-de-cada-puerto.md)): el artefacto para lo que es política, las banderas de arranque para lo que es hecho del despliegue. Un puerto añadiría un tercer sitio donde mirar cuando algo no cuadra, sin variación real que lo justifique.
+
+### `SignalSource` u otra frontera para el ciclo de vida del proceso — declinado
+
+Las señales POSIX son una sola cosa y no admiten segunda implementación. La tentación es abrirlo "para poder falsear las señales en los tests", y no hace falta: el caso de fallo manda una señal de verdad a un proceso de verdad ([0034](../decisiones/0034-la-parada-ordenada-la-conecta-la-cascara.md)).
+
 ### Puerto de caché — declinado por ahora
 
 Cachear catálogos o resoluciones de credencial es una preocupación de rendimiento que todavía no tiene forma conocida. Abrir la frontera ahora sería una abstracción anticipada basada en una sola aparición hipotética del patrón, que es lo que 2.5 prohíbe. Si aparece, cabe dentro de los adaptadores existentes sin nueva frontera; y si algún día no cabe, ese será el momento de abrirla — con la variación ya conocida.
@@ -158,10 +174,10 @@ Cachear catálogos o resoluciones de credencial es una preocupación de rendimie
 | `UsageReader` / `UsageWriter` | entrada / salida | **memoria** · **Redis** | 2 ✓ |
 | `CredentialResolver` | salida | **entorno** · **Vault** · gestor cloud · tokens OAuth | 4 ✓ |
 | `ToolInvoker` | salida | **MCP stdio** · **MCP HTTP** | 2 ✓ |
-| `DecisionRecorder` | salida | **stdout JSON** · **OpenTelemetry** · fichero auditado | 3 ✓ |
+| `DecisionRecorder` | salida | **JSON al registro** · **OpenTelemetry** · fichero auditado | 3 ✓ |
 
-En negrita, lo que existe: S2 dejó una por puerto y S3 la segunda. Lo demás sigue previsto y sin escribir — mTLS, HTTP/ConfigMap, el gestor de secretos del proveedor cloud, el almacén de tokens OAuth con refresco y el fichero de auditoría con rotación.
+En negrita, lo que existe: S2 dejó una por puerto y S3 la segunda. Lo demás sigue previsto y sin escribir — mTLS, HTTP/ConfigMap, el gestor de secretos del proveedor cloud, el almacén de tokens OAuth con refresco y el fichero de auditoría con rotación. **S4 no escribió ninguna**: empaquetar y operar no necesitó frontera nueva, que es la mejor noticia que podía dar sobre las siete que ya había.
 
 Ninguno de los siete contratos ha cambiado al llegar la segunda implementación. Es lo que el invariante 9 prometía y lo que [`../sesiones.md`](../sesiones.md) §5 puso a prueba: la variación se absorbe en la frontera, no en el modelo. Lo que sí apareció está registrado — el ciclo de vida que ningún puerto declara ([0023](../decisiones/0023-el-ciclo-de-vida-vive-en-el-compositor.md)) y el descubrimiento que no tiene por dónde llevar una credencial ([0025](../decisiones/0025-el-descubrimiento-mcp-no-autentica.md)).
 
-Declinados con motivo: `Clock`, aleatoriedad, repositorio genérico, unidad de trabajo, `ToolNameResolver`, caché.
+Declinados con motivo: `Clock`, aleatoriedad, repositorio genérico, unidad de trabajo, `ToolNameResolver`, caché, `HealthCheck`, `Config` y `SignalSource`.

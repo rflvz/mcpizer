@@ -112,7 +112,17 @@ Documentado en [`puertos.md`](puertos.md), con tabla resumen y con la lista de p
 
 *Automatizable parcialmente* — comprobar que cada puerto declarado en `runtime/` aparece en la tabla — pero la parte que importa, que la variación sea real y no hipotética, es juicio.
 
-### 3.5 Legibilidad estructural
+### 3.5 El artefacto desplegable arranca
+
+> El artefacto desplegable se construye y arranca desde cero contra una política de ejemplo.
+
+No es uno de los nueve criterios de la sección 5: es el criterio de terminación de S4 ([`../sesiones.md`](../sesiones.md) §5), y aparece aquí porque también falla el build y también lleva su caso de fallo.
+
+**Se construye con el mismo guion** que se ejecuta a mano y que invoca la imagen —un solo empaquetado, no uno "para los tests"—, **se arranca fuera del repositorio** con el entorno podado, y se le pasa un cliente MCP de verdad por los dos transportes. Que el proceso siga vivo no cuenta como arrancar: cuenta que vea lo concedido, que reciba motivo y sitio al ser denegado, y que una concesión llegue hasta el upstream.
+
+Los casos que lo hacen fallar están en [`entrega.md`](entrega.md) §4. Todo corre sin Docker, sin red y sin servicios; la imagen se construye aparte, en CI ([0032](../decisiones/0032-la-imagen-es-una-envoltura.md)).
+
+### 3.6 Legibilidad estructural
 
 > La estructura de primer nivel se lee como el dominio, no como el framework.
 
@@ -130,13 +140,24 @@ Revisión. La comprobación es la de la sección 2.2 de la arquitectura: quien a
 | Fronteras entre contextos | Cero aristas entre contextos, sin excepciones + prohibición de paquete común | Sí |
 | Frontera explicitada | `exports` con entrada única; el import profundo no resuelve | Sí |
 | Pureza del núcleo | Prohibición de E/S, reloj y aleatoriedad + tests sin dobles | Sí |
-| Blast radius | Snapshot de superficie pública por contexto | Casi |
-| Fallo cerrado | Tests de propiedad sobre configuraciones generadas | Casi |
-| Explicabilidad | `reason` obligatorio por tipos + propiedad de que `path` resuelve | Casi |
-| Justificación de puertos | Tabla en `puertos.md`; revisión al abrir frontera nueva | Revisión |
-| Legibilidad estructural | Revisión + lista de nombres técnicos prohibidos en primer nivel | Revisión |
+| Blast radius | Retrato de superficie pública por contexto, versionado y comprobado | Sí |
+| Fallo cerrado | Tests de propiedad sobre configuraciones generadas | Sí |
+| Explicabilidad | `reason` obligatorio por tipos + propiedad de que `path` resuelve | Sí |
+| Justificación de puertos | Se recorre la pasarela con las dos periferias y se comparan las decisiones | Sí, salvo el juicio |
+| Legibilidad estructural | Lista de nombres técnicos prohibidos en primer nivel | Sí, salvo el juicio |
+
+Y el criterio de terminación de cada sesión, por el mismo mecanismo y con las mismas exigencias:
+
+| Criterio | Mecanismo |
+|---|---|
+| S1 · el `path` de un motivo resuelve a una posición real | Recorrido sobre el ejemplo de [`artefacto.md`](artefacto.md) §2 |
+| S2 · ninguna credencial en registros ni en motivos | Centinelas irrepetibles y un escáner sobre todo lo observable |
+| S3 · dos implementaciones por puerto, intercambiables | Dos periferias completas, el mismo recorrido, decisiones idénticas |
+| S4 · el artefacto desplegable se construye y arranca desde cero | §3.5 |
 
 **Todas fallan el build.** Un criterio que solo avisa no es un criterio de aceptación.
+
+*La columna "¿Automático ya?" decía "Casi" o "Revisión" en cinco filas cuando este documento se escribió. Se ha puesto al día: lo que quedaba de revisión en las dos últimas es el juicio —si la variación de un puerto es real y no hipotética, si el primer nivel se lee como el dominio—, y eso sigue siendo humano por definición. Lo mecánico de las dos está automatizado.*
 
 ---
 

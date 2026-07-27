@@ -8,7 +8,9 @@ Las dos identidades nunca son la misma cosa. **Quién invoca** es el principal: 
 
 ## Estado
 
-**Sesión 3 completada**: la periferia real. Cada puerto tiene al menos **dos** implementaciones, intercambiables sin tocar el núcleo ni la orquestación.
+**Las cuatro sesiones, completadas.** La última empaqueta: hay un artefacto desplegable que se construye y arranca desde cero, sin este repositorio y sin red.
+
+Y antes de eso, la periferia real: cada puerto tiene al menos **dos** implementaciones, intercambiables sin tocar el núcleo ni la orquestación.
 
 | Puerto | Lo mínimo | Lo real |
 |---|---|---|
@@ -24,8 +26,6 @@ Y la pasarela habla los dos transportes también **de cara al cliente**: por std
 
 Qué implementación atiende a cada emisor, upstream y cuenta **lo dice el propio artefacto** —`kind`, `transport.kind` y el esquema de `secret.ref`—, así que la misma ejecución habla stdio con un upstream y HTTP con otro, y resuelve `env://` para una cuenta y `vault://` para la siguiente. Lo que no cabe en el artefacto —de dónde se carga el propio artefacto, dónde viven los contadores, adónde va la auditoría— se elige al arrancar, porque son hechos del despliegue y no de la política ([decisión 0022](docs/decisiones/0022-donde-se-elige-la-implementacion-de-cada-puerto.md)).
 
-Queda la sesión 4: empaquetado, despliegue y operación ([`docs/sesiones.md`](docs/sesiones.md) §5).
-
 ## Empezar
 
 ```bash
@@ -36,7 +36,7 @@ pnpm verify          # build · tipos · linter · dependencias · superficie ·
 Y sobre el ejemplo de [`docs/diseno/artefacto.md`](docs/diseno/artefacto.md) §2, que vive en [`examples/`](examples/):
 
 ```bash
-alias mcpizer='node runtime/dist/cli/main.js'
+alias mcpizer='node runtime/dist/cli/main.js'   # o el artefacto empaquetado, ver más abajo
 
 # ¿Está bien declarado? Referencias colgantes, concesiones ambiguas,
 # capacidades que ninguna tool realiza, tools que ningún mapeo cubre.
@@ -56,7 +56,7 @@ mcpizer diff antes.yaml despues.yaml
 
 Una denegación no dice solo que no: dice el código del motivo y el sitio exacto del artefacto que hay que tocar, como `examples/policy.yaml:90:5`. Ese es el bucle de corrección — se pregunta, se corrige, se vuelve a preguntar, sin desplegar y sin adivinar.
 
-El JSON Schema del artefacto se emite con `mcpizer schema`, para editores y validadores externos.
+El JSON Schema del artefacto se emite con `mcpizer schema`, para editores y validadores externos, y `mcpizer version` dice qué build está corriendo — la primera pregunta de cualquier incidencia.
 
 ## La pasarela
 
@@ -86,6 +86,33 @@ Las tools se anuncian como `upstream__tool`, siempre cualificadas: así declarar
 
 Y las dos identidades siguen separadas hasta el último metro. La credencial de la cuenta se resuelve **después** de que una decisión la haya autorizado, solo esa, y no vuelve hacia dentro bajo ninguna forma: no aparece en motivos, ni en registros, ni en mensajes de error. Hay un test que lo comprueba, y un caso que lo hace fallar.
 
+## Desplegarla
+
+```bash
+pnpm package         # → deployment/dist: el programa y el cierre de sus dependencias
+node deployment/dist/dist/cli/main.js version
+```
+
+Eso es el artefacto desplegable: un directorio autocontenido. Con él y un Node 22 hay pasarela — no hace falta este repositorio, ni pnpm, ni instalar nada, ni red ([decisión 0030](docs/decisiones/0030-el-artefacto-desplegable-es-el-cierre-de-runtime.md)). No lleva fuentes, ni compilador, ni linter, ni ejecutor de tests: lo que no viaja no hay que parchearlo.
+
+La imagen es una **envoltura** de ese mismo directorio, no otra forma de construirlo:
+
+```bash
+docker build -f deployment/Dockerfile -t mcpizer .
+docker run --rm -p 8080:8080 -v "$PWD/examples:/politica:ro" mcpizer \
+  serve /politica/policy.yaml --catalog /politica/catalog.yaml --issuer ci \
+  --http --host 0.0.0.0 --port 8080
+```
+
+`--host 0.0.0.0` es obligatorio dentro del contenedor y por eso **no** es el defecto: abrir un puerto de autorización a toda la red tiene que ser una decisión escrita.
+
+Lo que un despliegue puede dar por cierto está en [`docs/diseno/entrega.md`](docs/diseno/entrega.md) §3, y lo esencial cabe aquí:
+
+- **SIGTERM y SIGINT** cierran ordenadamente —clientes, sesiones upstream, contadores y auditoría, en ese orden— y salen con **0**. Morir *por* la señal significaría que nadie cerró nada, y que el último lote de auditoría se perdió.
+- **`GET /health`** contesta sin credencial, porque quien pregunta es un orquestador anónimo. Por eso solo sale lo que es público: estado, versión del proceso y versión de la política. Nunca el origen del artefacto, y nunca una enumeración de capacidades, upstreams o cuentas. Dice **vivo**, no *listo*: la bóveda, los contadores y los upstreams no se contactan al arrancar y fallan cerrado en la invocación.
+- **Un fallo de arranque es una salida con código** — y sale de verdad, también cuando falla a medias con un upstream ya arrancado. Un proceso que fija el código y no muere es el modo real en que esto se rompe. Reiniciar en bucle ante una política ausente es el comportamiento correcto.
+- **TLS lo termina el despliegue**, no este proceso; pero la autorización **no** puede terminarla nadie delante, o una denegación explicable se convierte en un 401 mudo ([decisión 0033](docs/decisiones/0033-tls-fuera-cors-ninguno-techo-dentro.md)).
+
 ## Estructura
 
 ```
@@ -97,6 +124,7 @@ policy/        ¿qué se ha declarado?
 adapters/      periferia: identidad, bóvedas, transporte MCP, almacenamiento
 runtime/       composición: traduce, orquesta, ejecuta efectos
 verification/  el arnés de aceptación: las comprobaciones y sus casos de fallo
+deployment/    cómo sale de aquí: el empaquetado y su imagen
 examples/      un artefacto completo y su catálogo declarado
 ```
 
@@ -107,7 +135,7 @@ Los cinco primeros son el núcleo. **Ninguno importa a otro**, y el gestor de m�
 | Documento | Para qué |
 |---|---|
 | [`docs/arquitectura.md`](docs/arquitectura.md) | **Vinculante.** Estilo, invariantes y criterios de aceptación. Viaja completo a cualquier sesión de trabajo. |
-| [`docs/diseno/`](docs/diseno/) | Diseño detallado: contextos, puertos, modelo, artefacto declarativo y verificación. |
+| [`docs/diseno/`](docs/diseno/) | Diseño detallado: contextos, puertos, modelo, artefacto declarativo, verificación y entrega. |
 | [`docs/sesiones.md`](docs/sesiones.md) | Cómo se trocea el trabajo: cuatro sesiones, qué entra en cada una y cuándo termina. |
 | [`docs/decisiones/`](docs/decisiones/) | Registro de decisiones tomadas durante el diseño y la implementación, con su motivo. |
 
@@ -115,7 +143,7 @@ Empieza por [`docs/diseno/README.md`](docs/diseno/README.md): dice qué document
 
 ## Cómo se comprueba
 
-Los nueve criterios de la sección 5 de la arquitectura "se ejecutan y se responden, no se opinan". `pnpm verify` es ese comando, y todo lo que comprueba falla el build:
+Los nueve criterios de la sección 5 de la arquitectura "se ejecutan y se responden, no se opinan", y con ellos los criterios de terminación de las cuatro sesiones. `pnpm verify` es ese comando, y todo lo que comprueba falla el build:
 
 | Qué | Cómo |
 |---|---|
@@ -127,10 +155,17 @@ Los nueve criterios de la sección 5 de la arquitectura "se ejecutan y se respon
 | Fallo cerrado y explicabilidad | Tests de propiedad sobre artefactos generados |
 | Ninguna credencial en registros ni motivos | Centinela irrepetible, y un escáner sobre todo lo observable, en las dos periferias |
 | Dos implementaciones por puerto, intercambiables | Se recorre la pasarela entera dos veces y se comparan las decisiones |
+| El artefacto desplegable arranca desde cero | Se empaqueta, se arranca fuera del repositorio y se le conecta un cliente MCP de verdad |
 
 Y **cada una tiene un caso que la hace fallar**, en [`verification/fixtures/violations/`](verification/fixtures/violations/). Una comprobación que nunca ha fallado no está verificada: sin ese caso, una sesión larga cree tener red y no la tiene, que es peor que no tenerla porque cambia cómo se decide.
 
-La última fila es el criterio de terminación de la sesión 3 hecho comando. Se monta la misma política con dos periferias completas —fichero·declarado·clave estática·memoria·entorno·stdio·stderr, y git·descubrimiento·OIDC·Redis·Vault·HTTP·OTLP—, se hace el mismo recorrido, y las decisiones tienen que salir idénticas. Todo corre en proceso, contra servidores de fixture que hablan los protocolos de verdad: no hace falta Docker, ni red, ni un servicio levantado.
+Las dos últimas filas son los criterios de terminación de las sesiones 3 y 4, hechos comando.
+
+La **penúltima** monta la misma política con dos periferias completas —fichero·declarado·clave estática·memoria·entorno·stdio·stderr, y git·descubrimiento·OIDC·Redis·Vault·HTTP·OTLP—, hace el mismo recorrido, y las decisiones tienen que salir idénticas. Todo corre en proceso, contra servidores de fixture que hablan los protocolos de verdad.
+
+La **última** se toma en serio las tres palabras del criterio. *Se construye* con el mismo guion que se ejecuta a mano y que invoca la imagen, no con uno "para los tests". *Desde cero* significa fuera del repositorio y con el entorno podado — y un artefacto sin su cierre de dependencias, que parece un artefacto y tiene punto de entrada, solo se cae al arrancarlo. *Arranca* no es que el proceso siga vivo: es que un cliente MCP ve lo concedido, recibe motivo y sitio al ser denegado, y una concesión llega hasta el upstream con su credencial. Después se le manda SIGTERM y tiene que salir con **0**, sin temporizador que fuerce la salida — un proceso que no termina tiene un asa que nadie cerró, y forzarlo escondería la fuga.
+
+Nada de esto necesita Docker, ni red, ni un servicio levantado. La imagen sí lo necesita, y por eso se construye y se arranca en un trabajo de CI aparte ([decisión 0032](docs/decisiones/0032-la-imagen-es-una-envoltura.md)).
 
 ## Las cinco capacidades del dominio
 
@@ -144,4 +179,4 @@ La última fila es el criterio de terminación de la sesión 3 hecho comando. Se
 
 TypeScript sobre el SDK oficial de MCP. La elección condiciona nombres y herramientas de verificación, no la estructura — ver [`docs/decisiones/0001-lenguaje-y-base-mcp.md`](docs/decisiones/0001-lenguaje-y-base-mcp.md).
 
-Requiere Node 22 o superior y pnpm.
+**Para desarrollarlo** hacen falta Node 22 o superior y pnpm. **Para ejecutarlo**, solo Node 22: el artefacto desplegable lleva dentro todo lo demás.
