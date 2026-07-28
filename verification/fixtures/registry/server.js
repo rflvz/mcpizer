@@ -88,8 +88,9 @@ export async function startRegistry(paquetes) {
   const porNombre = new Map();
   /** ruta → cómo producir esos bytes. */
   const rutas = new Map();
-  /** Lo que se ha pedido, para poder afirmar que no se pidió nada de fuera del espejo. */
+  /** Lo que se ha pedido, y lo que no se ha sabido contestar. */
   const peticiones = [];
+  const noServidas = [];
 
   for (const paquete of paquetes) {
     const { manifiesto } = paquete;
@@ -150,6 +151,11 @@ export async function startRegistry(paquetes) {
     // `@ambito/nombre` viaja como `@ambito%2fnombre`.
     const doc = documento(decodeURIComponent(ruta).slice(1));
     if (doc === undefined) {
+      // Se anota, y es lo que permite afirmar que la instalación no necesitó
+      // nada de fuera del espejo. Sin red, un 404 aquí no es un fallo de esta
+      // comprobación: es una dependencia que nadie declaró y que en una máquina
+      // con red se habría resuelto sola, en silencio.
+      noServidas.push(ruta);
       response.writeHead(404, { 'content-type': 'application/json' });
       response.end('{"error":"Not found"}');
       return;
@@ -165,6 +171,7 @@ export async function startRegistry(paquetes) {
   return {
     url: `http://127.0.0.1:${puerto}`,
     peticiones,
+    noServidas,
     detiene: () =>
       new Promise((resolve) => {
         server.closeAllConnections();

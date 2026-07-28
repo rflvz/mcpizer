@@ -99,6 +99,15 @@ describe('lo que se publica se instala', () => {
     expect(aparte).toHaveLength(PUBLICABLES.length - 1);
   });
 
+  it('y no hizo falta nada que el espejo no tuviera', () => {
+    // El espejo es el cierre que fijó el fichero de bloqueo, y no hay ningún
+    // otro sitio de donde sacar nada. Que no quedara ni una petición sin servir
+    // es lo que convierte «se instala sin red» en una afirmación comprobada en
+    // vez de en una propiedad del sitio donde se ejecutan los tests.
+    expect(instalado.registro.noServidas).toEqual([]);
+    expect(instalado.registro.peticiones).toContain('/mcpizer');
+  });
+
   it('valida el ejemplo sin red y sin repositorio a la vista', async () => {
     const { code, stdout } = await ejecuta(instalado, [
       'validate',

@@ -41,6 +41,8 @@ export interface Paquete {
 export interface Registro {
   readonly url: string;
   readonly peticiones: readonly string[];
+  /** Lo que se pidió y el espejo no tenía. Vacío es la prueba de que no hizo falta la red. */
+  readonly noServidas: readonly string[];
   detiene(): Promise<void>;
 }
 
