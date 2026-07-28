@@ -34,7 +34,8 @@ const TALLER = 'mcpizer-workspace';
 
 export interface Paquete {
   readonly manifiesto: Record<string, unknown> & { name: string; version: string };
-  readonly tarball: Buffer;
+  /** Los bytes, cuando alguien los pida. El espejo tiene el almacén entero y npm solo pide parte. */
+  produce(): Buffer;
 }
 
 export interface Registro {
@@ -85,7 +86,7 @@ export function propios(): Promise<Paquete[]> {
       const tarball = readFileSync(join(destino, fichero));
       const manifiesto = JSON.parse(extrae(tarball, 'package/package.json').toString('utf8')) as
         Paquete['manifiesto'];
-      return { manifiesto, tarball };
+      return { manifiesto, produce: () => tarball };
     });
   })();
   return empaquetados;
@@ -93,7 +94,7 @@ export function propios(): Promise<Paquete[]> {
 
 let espejo: Paquete[] | undefined;
 
-/** El cierre de terceros, empaquetado una sola vez por proceso: son casi cien. */
+/** El almacén, recorrido una sola vez por proceso. Empaquetar lo empaqueta quien lo pida. */
 function terceros(): Paquete[] {
   espejo ??= espeja(REPO_ROOT, esPropio) as Paquete[];
   return espejo;

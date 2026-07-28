@@ -25,9 +25,6 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { empaqueta } from './tarball.js';
 
-/** El marcador que se sustituye por el puerto real, que no se sabe hasta escuchar. */
-const PUERTO = '__PUERTO__';
-
 /**
  * Lee el almacén de pnpm y devuelve `nombre@version → directorio`.
  *
@@ -77,60 +74,89 @@ export function cierre(root, excluir = () => false) {
 /**
  * Levanta el registro.
  *
- * `paquetes` es una lista de `{ manifiesto, tarball }`. El manifiesto es lo que
+ * `paquetes` es una lista de `{ manifiesto, produce }`. El manifiesto es lo que
  * acaba en el documento del paquete, que es de donde npm resuelve las
  * dependencias — el tarball solo decide qué ficheros aterrizan.
+ *
+ * `produce` no se llama hasta que alguien pide ese paquete. El espejo tiene el
+ * almacén entero, con las dependencias de desarrollo dentro; npm solo pide las
+ * que están en el grafo que resuelve, y empaquetar el compilador y el ejecutor
+ * de tests para que nadie los descargue sería trabajo puro.
  */
 export async function startRegistry(paquetes) {
-  /** ruta → bytes */
-  const tarballs = new Map();
-  /** nombre → documento del paquete */
-  const documentos = new Map();
+  /** nombre → las versiones que hay de él, sin empaquetar todavía. */
+  const porNombre = new Map();
+  /** ruta → cómo producir esos bytes. */
+  const rutas = new Map();
   /** Lo que se ha pedido, para poder afirmar que no se pidió nada de fuera del espejo. */
   const peticiones = [];
 
-  for (const { manifiesto, tarball } of paquetes) {
+  for (const paquete of paquetes) {
+    const { manifiesto } = paquete;
     const ruta = `/-/${manifiesto.name.replace('/', '+')}-${manifiesto.version}.tgz`;
-    tarballs.set(ruta, tarball);
 
-    const documento = documentos.get(manifiesto.name) ?? {
-      name: manifiesto.name,
-      'dist-tags': {},
-      versions: {},
-    };
-    documento.versions[manifiesto.version] = {
-      ...manifiesto,
-      dist: {
-        tarball: `http://127.0.0.1:${PUERTO}${ruta}`,
-        shasum: createHash('sha1').update(tarball).digest('hex'),
-        integrity: `sha512-${createHash('sha512').update(tarball).digest('base64')}`,
-      },
-    };
-    documento['dist-tags'].latest = manifiesto.version;
-    documentos.set(manifiesto.name, documento);
+    // Memoizado: el documento del paquete necesita los bytes para anunciar su
+    // `integrity`, y npm los pide después. Empaquetar dos veces daría dos
+    // tarballs idénticos y el doble de trabajo.
+    let bytes;
+    const produce = () => (bytes ??= paquete.produce());
+
+    rutas.set(ruta, produce);
+    porNombre.set(manifiesto.name, [
+      ...(porNombre.get(manifiesto.name) ?? []),
+      { manifiesto, ruta, produce },
+    ]);
+  }
+
+  /** nombre → documento ya servido, para no rehacerlo en cada petición. */
+  const documentos = new Map();
+
+  function documento(nombre) {
+    const versiones = porNombre.get(nombre);
+    if (versiones === undefined) return undefined;
+
+    let doc = documentos.get(nombre);
+    if (doc !== undefined) return doc;
+
+    doc = { name: nombre, 'dist-tags': {}, versions: {} };
+    for (const { manifiesto, ruta, produce } of versiones) {
+      const tarball = produce();
+      doc.versions[manifiesto.version] = {
+        ...manifiesto,
+        dist: {
+          tarball: `http://127.0.0.1:${puerto}${ruta}`,
+          shasum: createHash('sha1').update(tarball).digest('hex'),
+          integrity: `sha512-${createHash('sha512').update(tarball).digest('base64')}`,
+        },
+      };
+      doc['dist-tags'].latest = manifiesto.version;
+    }
+
+    documentos.set(nombre, doc);
+    return doc;
   }
 
   const server = createServer((request, response) => {
     const ruta = new URL(request.url, 'http://registro').pathname;
     peticiones.push(ruta);
 
-    const tarball = tarballs.get(ruta);
-    if (tarball !== undefined) {
+    const produce = rutas.get(ruta);
+    if (produce !== undefined) {
       response.writeHead(200, { 'content-type': 'application/octet-stream' });
-      response.end(tarball);
+      response.end(produce());
       return;
     }
 
     // `@ambito/nombre` viaja como `@ambito%2fnombre`.
-    const documento = documentos.get(decodeURIComponent(ruta).slice(1));
-    if (documento === undefined) {
+    const doc = documento(decodeURIComponent(ruta).slice(1));
+    if (doc === undefined) {
       response.writeHead(404, { 'content-type': 'application/json' });
       response.end('{"error":"Not found"}');
       return;
     }
 
     response.writeHead(200, { 'content-type': 'application/json' });
-    response.end(JSON.stringify(documento).replaceAll(PUERTO, String(puerto)));
+    response.end(JSON.stringify(doc));
   });
 
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
@@ -147,10 +173,10 @@ export async function startRegistry(paquetes) {
   };
 }
 
-/** El espejo completo: el cierre del almacén, empaquetado. */
+/** El espejo: todo lo que hay en el almacén, listo para empaquetarse si lo piden. */
 export function espeja(root, excluir) {
   return [...cierre(root, excluir).values()].map(({ manifiesto, dir }) => ({
     manifiesto,
-    tarball: empaqueta(dir),
+    produce: () => empaqueta(dir),
   }));
 }
