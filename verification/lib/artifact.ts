@@ -203,7 +203,16 @@ function texto(content: unknown): string {
     : String(content);
 }
 
-async function recorre(transport: Transport): Promise<RecorridoDeCliente> {
+/**
+ * Un cliente MCP del SDK oficial sobre el transporte que sea, y el recorrido que
+ * toda comprobación de borde exterior hace: listar, invocar, cerrar.
+ *
+ * Se exporta para que la comprobación de lo instalado use **esta misma**
+ * máquina. Un segundo cliente escrito aparte mediría lo que ese cliente entiende
+ * por MCP, y las dos comprobaciones podrían dejar de decir lo mismo sin que nada
+ * se pusiera rojo.
+ */
+export async function recorre(transport: Transport): Promise<RecorridoDeCliente> {
   const client = new Client({ name: 'cliente-de-humo', version: '0.0.0' });
   await client.connect(transport);
 

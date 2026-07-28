@@ -1,8 +1,19 @@
 {
-  "name": "@mcpizer/runtime",
+  "name": "mcpizer",
   "version": "0.1.0",
-  "private": true,
+  "description": "Pasarela MCP con autorización: dado quién invoca y qué intenta hacer, qué tools ve, contra qué cuenta se ejecuta y bajo qué límites",
+  "keywords": ["mcp", "model-context-protocol", "authorization", "gateway", "policy"],
+  "homepage": "https://github.com/rflvz/mcpizer#readme",
+  "bugs": "https://github.com/rflvz/mcpizer/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rflvz/mcpizer.git",
+    "directory": "runtime"
+  },
   "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",

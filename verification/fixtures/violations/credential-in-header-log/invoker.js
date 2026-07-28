@@ -15,7 +15,7 @@
  * fuga, no que el andamiaje la fabrica.
  */
 import { declaredCatalogFile, envCredentials, memoryUsage, policyFile, staticKeyPrincipals, stderrRecorder } from '@mcpizer/adapters';
-import { gateway, loadPolicy } from '@mcpizer/runtime';
+import { gateway, loadPolicy } from 'mcpizer';
 
 const [, , policyPath, catalogPath, issuerId, toolName] = process.argv;
 

@@ -22,7 +22,7 @@ import { fileURLToPath } from 'node:url';
 const REPO_ROOT = fileURLToPath(new URL('..', import.meta.url));
 
 /** El paquete que *es* el producto: la composición, con su cierre. */
-const DEPLOYABLE = '@mcpizer/runtime';
+const DEPLOYABLE = 'mcpizer';
 
 /** Dónde vive el punto de entrada dentro del artefacto. */
 export const ENTRY = join('dist', 'cli', 'main.js');
