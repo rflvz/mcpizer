@@ -48,6 +48,28 @@ La imagen de contenedor es una **envoltura** de ese directorio, no otra forma de
 
 ---
 
+## 2.1 Cómo llega el producto a quien lo usa
+
+Hay tres caminos, y la regla que los gobierna es una: **un solo empaquetado, envuelto de tres maneras**. Ninguno construye el producto por su cuenta; si alguno lo hiciera habría dos productos y solo uno comprobado ([0032](../decisiones/0032-la-imagen-es-una-envoltura.md)).
+
+| Camino | Para quién | Qué recibe |
+|---|---|---|
+| El **artefacto** (`pnpm package`) | Un despliegue | Un directorio autocontenido: §2 |
+| La **imagen** | Un despliegue en contenedor | Ese mismo directorio, envuelto |
+| El **registro npm** (`npm i -g mcpizer`, `npx mcpizer`) | Quien verifica en seco, o prueba la pasarela | Los siete paquetes, resueltos por npm |
+
+Los dos primeros exigen este repositorio. El tercero es el único en el que **el repositorio no interviene**: lo que llega es un tarball, y lo que ese tarball no lleve no existe. Por eso es también el único que se puede romper sin que nada en el árbol de trabajo lo note.
+
+Tres cosas son vinculantes, y las tres se comprueban ([0041](../decisiones/0041-se-publican-los-siete-y-el-producto-se-llama-mcpizer.md), [0043](../decisiones/0043-lo-instalado-se-comprueba-con-el-npm-real.md)):
+
+- **Los siete paquetes se publican juntos y con la misma versión.** `mcpizer` pide sus contextos por versión exacta, porque eso es lo que queda al sustituir `workspace:*`. Se instalan los siete o no se instala ninguno.
+- **La frontera entre contextos sobrevive al publicado.** Cada contexto aterriza como un paquete suyo, con su manifiesto y su superficie declarada. Aplanarlos dejaría verificada en el árbol de trabajo una propiedad que el producto distribuido no tiene, que es el mismo argumento por el que el artefacto no es un fichero único.
+- **El nombre que se teclea es el del producto.** `mcpizer`, no el nombre que ese paquete tiene dentro de la arquitectura.
+
+Y una asimetría que conviene no confundir con un descuido: publicar es la única de las tres que **no se puede deshacer**. Una imagen se sobrescribe y un artefacto se vuelve a construir; una versión en un registro solo se sucede. De ahí que el guion que publica sea seco por defecto y se niegue en cinco casos distintos antes de subir nada.
+
+---
+
 ## 3. El contrato de operación
 
 Esto es lo que un despliegue puede dar por cierto. Es la parte vinculante del documento: cualquier plataforma que lo respete sirve, y por eso aquí no hay manifiestos de ninguna en concreto.
@@ -131,6 +153,18 @@ Y lo que S4 añade de operación lleva sus casos de fallo, porque una comprobaci
 
 Todo esto corre dentro del comando de verificación, **sin Docker, sin red y sin servicios levantados**. La imagen se construye y se arranca aparte, en CI, porque necesita un demonio de contenedores y el criterio no puede depender de él.
 
+### 4.1 Y lo mismo para lo que se publica
+
+El tercer camino de §2.1 tiene su propio criterio —*lo que se publica se instala y arranca*— y las mismas tres trampas:
+
+| La palabra | Cómo se queda en teatro | Qué lo impide |
+|---|---|---|
+| **se publica** | El arnés empaqueta a su manera | Los siete tarballs los produce `pnpm pack`, que es el camino de `pnpm publish`; y el manifiesto que se anuncia se lee **del tarball**, porque la sustitución de `workspace:*` es lo que hay que comprobar |
+| **se instala** | Un doble contesta que sí | El cliente de `npm` real, contra un registro de fixture que habla su protocolo y cuyo espejo es el cierre que fijó el fichero de bloqueo. Y `npx`, que es otro camino, aparte |
+| **arranca** | Se mira si el fichero existe | Se ejecuta **por su nombre** —shebang y enlace incluidos—, fuera del repositorio: valida, explica con su sitio, y atiende a un cliente MCP de verdad |
+
+Con sus casos de fallo: un `private` olvidado, una versión desalineada, un paquete sin construir y un binario sin shebang se rechazan **antes** de subir nada. Y el quinto, que ningún manifiesto delata: una dependencia de producción sin declarar se instala sin una queja y no arranca — que es la razón de instalar de verdad y no limitarse a mirar los manifiestos.
+
 ---
 
 ## 5. Qué sigue abierto
@@ -140,6 +174,6 @@ De lo que el diseño había previsto, **nada**. El generador del catálogo decla
 Eso no quiere decir que no quede trabajo. Quiere decir que el que queda ya no está prometido por ningún documento, y conviene nombrar lo que se sabe que falta:
 
 - **Ningún adaptador tiene todavía un usuario.** No hay despliegue. Un adaptador sin usuario es un adaptador cuyo primer error de verdad lo encuentra alguien que confiaba en él, y por eso cada uno se prueba contra un servidor que habla su protocolo en vez de contra un doble. Si alguno no encuentra usuario en un tiempo razonable, lo correcto es **retirarlo**, no dejarlo envejecer.
-- **La imagen se construye y no se publica.** CI la construye y la arranca en cada PR, pero no hay registro donde dejarla, porque no hay ninguno. Cuando lo haya, es una decisión de distribución y no de diseño.
+- **Nada se ha publicado todavía, y por dos motivos distintos.** La **imagen** no tiene registro donde dejarse, porque no hay ninguno; CI la construye y la arranca en cada PR, y eso es todo. Los **siete paquetes** sí tienen a dónde ir —el registro público de npm—, y lo que falta es elegir licencia, que no es una decisión de diseño ([0042](../decisiones/0042-la-licencia-la-elige-el-dueno.md)). La diferencia importa: de lo segundo está comprobado que se instala y arranca; lo único que no se ha hecho es el paso irreversible.
 - **La sonda dice vivo, no listo.** Es deliberado y está razonado en §3.3; si algún día hace falta distinguirlas, lo publicable es un estado, nunca la dirección de nada.
 - **Un puerto nuevo sigue exigiendo lo mismo que exigía**: variación real conocida y dos implementaciones nombradas. Que las siete fronteras hayan aguantado hasta cuatro implementaciones sin cambiar de contrato es un argumento para no abrir la octava a la ligera.

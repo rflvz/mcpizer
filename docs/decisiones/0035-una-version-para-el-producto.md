@@ -1,6 +1,6 @@
 # 0035 — Una versión para el producto; los siete paquetes siguen privados y sin versionar
 
-**Estado**: Vigente
+**Estado**: Sustituida en parte por [0041](0041-se-publican-los-siete-y-el-producto-se-llama-mcpizer.md), que publica los siete y les da la misma versión. Lo demás sigue vigente.
 
 ## Contexto
 

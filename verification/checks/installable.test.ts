@@ -37,6 +37,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { publicables, PUBLICABLES } from '../../deployment/publish.js';
 import { EJEMPLO, entorno, recorre, type RecorridoDeCliente } from '../lib/artifact.js';
 import {
+  conNpx,
   ejecuta,
   instala,
   instalacion,
@@ -131,6 +132,15 @@ describe('lo que se publica se instala', () => {
     expect(stdout).toMatch(/policy\.yaml:\d+:\d+/);
   });
 
+  it('y `npx mcpizer` contesta lo mismo sin instalar nada', async () => {
+    // Es lo primero que ofrece el README, y el camino que de verdad recorre
+    // quien solo quiere preguntarle una cosa a una política. Resuelve, descarga
+    // y ejecuta en un paso, en un árbol que no es el de nadie.
+    const { code, stdout } = await conNpx(instalado.registro, ['version']);
+    expect(code).toBe(0);
+    expect(stdout).toContain(`mcpizer ${instalado.version}`);
+  }, 120_000);
+
   it('y un cliente MCP real se conecta a lo instalado y ve solo lo concedido', async () => {
     const cliente: RecorridoDeCliente = await recorre(
       new StdioClientTransport({
@@ -179,7 +189,7 @@ describe('publicar se niega antes de subir nada', () => {
 
   it('y sobre este repositorio lo único que falta es elegir licencia', () => {
     // La licencia no la elige el diseño ni esta comprobación: es del dueño
-    // (decisión 0043). Lo que sí puede afirmarse es que no falta **nada más**,
+    // (decisión 0042). Lo que sí puede afirmarse es que no falta **nada más**,
     // de modo que el día que se elija, publicar sea un solo paso.
     const { problemas } = publicables(REPO_ROOT);
     expect(problemas.filter((problema) => !problema.includes('`license`'))).toEqual([]);

@@ -186,6 +186,54 @@ export function instalacion(): Promise<Instalacion> {
 }
 
 /**
+ * `npx mcpizer …`, que es el camino sin instalar nada.
+ *
+ * Merece comprobación propia y no es lo mismo que lo de arriba: `npm exec`
+ * resuelve, descarga y ejecuta en un paso, contra un árbol temporal suyo. Es el
+ * camino que recorre quien solo quiere preguntarle algo a una política una vez,
+ * y el que el README ofrece primero — anunciarlo sin ejecutarlo sería
+ * exactamente la clase de promesa que este repositorio no hace.
+ */
+export async function conNpx(
+  reg: Registro,
+  args: readonly string[],
+): Promise<{ code: number; stdout: string; stderr: string }> {
+  const afuera = await mkdtemp(join(tmpdir(), 'mcpizer-npx-'));
+
+  try {
+    const { stdout, stderr } = await execFileAsync(
+      'npm',
+      [
+        'exec',
+        '--yes',
+        '--registry',
+        reg.url,
+        '--cache',
+        join(afuera, 'cache'),
+        '--no-audit',
+        '--no-fund',
+        '--',
+        PRODUCTO,
+        ...args,
+      ],
+      {
+        cwd: afuera,
+        env: {
+          PATH: process.env['PATH'] ?? '',
+          HOME: afuera,
+          npm_config_update_notifier: 'false',
+        },
+        maxBuffer: 32 * 1024 * 1024,
+      },
+    );
+    return { code: 0, stdout, stderr };
+  } catch (error) {
+    const fallo = error as { code?: number; stdout?: string; stderr?: string };
+    return { code: fallo.code ?? 1, stdout: fallo.stdout ?? '', stderr: fallo.stderr ?? '' };
+  }
+}
+
+/**
  * Ejecuta el binario instalado como lo haría quien lo instaló: por su nombre.
  *
  * No se invoca `node <ruta>`: lo que hay que comprobar es que el enlace que npm

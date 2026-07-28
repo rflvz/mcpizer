@@ -62,7 +62,7 @@ export function publicables(root = REPO_ROOT) {
   const paquetes = PUBLICABLES.map((dir) => ({ dir, manifest: manifiesto(root, dir) }));
   const problemas = [];
 
-  // 1. Una sola versión para el producto (decisión 0035, extendida por la 0042).
+  // 1. Una sola versión para el producto (decisión 0035, extendida por la 0041).
   //
   // Los siete se instalan juntos: `mcpizer` los pide por versión exacta, porque
   // eso es lo que `pnpm` escribe al sustituir `workspace:*`. Publicar seis a una
@@ -105,7 +105,7 @@ export function publicables(root = REPO_ROOT) {
     // 4. La licencia.
     //
     // No es una decisión de diseño ni de esta sesión: es del dueño del
-    // repositorio (decisión 0043). Publicar sin ella deja un paquete que nadie
+    // repositorio (decisión 0042). Publicar sin ella deja un paquete que nadie
     // puede usar legalmente y que npm marca como propietario para siempre en esa
     // versión, así que se bloquea aquí en vez de avisarse.
     if (typeof manifest.license !== 'string' || manifest.license === '') {
