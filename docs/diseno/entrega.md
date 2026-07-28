@@ -135,7 +135,11 @@ Todo esto corre dentro del comando de verificación, **sin Docker, sin red y sin
 
 ## 5. Qué sigue abierto
 
-Con motivo, y registrado en [0036](../decisiones/0036-lo-que-s4-no-cierra.md):
+De lo que el diseño había previsto, **nada**. El generador del catálogo declarado existe ([0039](../decisiones/0039-el-generador-del-catalogo-declarado.md)) y las cinco implementaciones de puerto que faltaban están escritas, cada una con su servidor de fixture hablando el protocolo real ([0040](../decisiones/0040-se-escriben-las-implementaciones-previstas.md)). [`puertos.md`](puertos.md) §4 ya no tiene nada en la columna de "previsto y sin escribir".
 
-- **El generador del catálogo declarado.** El catálogo declarado es lo que permite arrancar y verificar sin red; hoy se escribe a mano. Generarlo desde los upstreams reales sigue pendiente porque su contrato —catálogo entero, un upstream, o el diff contra el versionado— se decide mejor con un despliegue grande delante.
-- **Las implementaciones de puerto previstas y sin escribir**, que [`puertos.md`](puertos.md) §4 enumera: mTLS, `PolicySource` sobre HTTP, el gestor de secretos del proveedor cloud, el almacén de tokens OAuth con refresco y el fichero de auditoría con rotación. Ninguna es una frontera nueva: son huecos en fronteras ya abiertas y verificadas.
+Eso no quiere decir que no quede trabajo. Quiere decir que el que queda ya no está prometido por ningún documento, y conviene nombrar lo que se sabe que falta:
+
+- **Ningún adaptador tiene todavía un usuario.** No hay despliegue. Un adaptador sin usuario es un adaptador cuyo primer error de verdad lo encuentra alguien que confiaba en él, y por eso cada uno se prueba contra un servidor que habla su protocolo en vez de contra un doble. Si alguno no encuentra usuario en un tiempo razonable, lo correcto es **retirarlo**, no dejarlo envejecer.
+- **La imagen se construye y no se publica.** CI la construye y la arranca en cada PR, pero no hay registro donde dejarla, porque no hay ninguno. Cuando lo haya, es una decisión de distribución y no de diseño.
+- **La sonda dice vivo, no listo.** Es deliberado y está razonado en §3.3; si algún día hace falta distinguirlas, lo publicable es un estado, nunca la dirección de nada.
+- **Un puerto nuevo sigue exigiendo lo mismo que exigía**: variación real conocida y dos implementaciones nombradas. Que las siete fronteras hayan aguantado hasta cuatro implementaciones sin cambiar de contrato es un argumento para no abrir la octava a la ligera.

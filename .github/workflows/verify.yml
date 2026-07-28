@@ -43,6 +43,12 @@ jobs:
       - name: dice qué build lleva
         run: docker run --rm mcpizer:ci version
 
+      # El README recomienda `git+<url>#<ref>:<ruta>` como origen de política, y
+      # ese adaptador invoca al binario. Sin esta comprobación, que esté dentro
+      # de la imagen sería una afirmación de revisión y no un hecho.
+      - name: lleva lo que el origen sobre git necesita
+        run: docker run --rm --entrypoint git mcpizer:ci --version
+
       - name: arranca contra la política de ejemplo, y la sonda contesta
         run: |
           set -euo pipefail

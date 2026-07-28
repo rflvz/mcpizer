@@ -18,16 +18,21 @@
  */
 export { policyFile, type LoadedArtifact } from './policy-file.js';
 export { policyGit, parseGitOrigin, type GitOrigin } from './policy-git.js';
-export { declaredCatalogFile, type DiscoveredTool } from './declared-catalog.js';
+export { policyHttp, parseHttpOrigin, type HttpOrigin } from './policy-http.js';
+export { declaredCatalogFile, declaredCatalogYaml, type DiscoveredTool } from './declared-catalog.js';
 export { staticKeyPrincipals, type IssuerVault, type StaticKeyIssuer } from './static-key-principal.js';
+export { mtlsPrincipals, type MtlsIssuer } from './mtls-principal.js';
 export { memoryUsage, type MemoryUsage } from './memory-usage.js';
 export { redisUsage, type RedisUsage } from './redis-usage.js';
 export { envCredentials } from './env-credentials.js';
 export { vaultCredentials, type VaultOptions } from './vault-credentials.js';
+export { gcpSecretsCredentials, type GcpSecretsOptions } from './gcp-secrets-credentials.js';
+export { oauthCredentials, type OauthOptions } from './oauth-credentials.js';
 export { mcpStdioInvoker, UPSTREAM_CREDENTIAL_ENV, type StdioInvoker } from './mcp-stdio-invoker.js';
 export { mcpHttpInvoker, type HttpInvoker } from './mcp-http-invoker.js';
 export { mcpDiscovery, type DeclaredUpstream, type McpDiscovery } from './mcp-discovery.js';
 export { stderrRecorder } from './stderr-recorder.js';
+export { fileRecorder, type FileRecorder, type FileRecorderOptions } from './file-recorder.js';
 export {
   type ExposedTool,
   type GatewayHandlers,
@@ -49,6 +54,7 @@ export {
   periphery,
   policySourceFor,
   type CatalogPeriphery,
+  type CloudSecretsAccess,
   type Periphery,
   type PeripheryIssuer,
   type PeripherySpec,

@@ -140,3 +140,121 @@ describe('la superficie de la propia herramienta', () => {
     expect(run.stderr).toContain('No se pudo leer el artefacto');
   });
 });
+
+describe('catalog', () => {
+  const UPSTREAM = join(REPO, 'verification', 'fixtures', 'upstream', 'server.js');
+
+  function conUpstreamReal(): string {
+    const directory = mkdtempSync(join(tmpdir(), 'mcpizer-catalogo-'));
+    const policy = join(directory, 'policy.yaml');
+    writeFileSync(
+      policy,
+      `version: 1
+capabilities:
+  - id: billing.invoice.issue
+upstreams:
+  - id: facturacion
+    transport:
+      kind: mcp-stdio
+      command: ${process.execPath}
+      args: ["${UPSTREAM}"]
+    tools:
+      - name: create_invoice
+        capability: billing.invoice.issue
+accounts:
+  - id: facturacion-ops
+    secret: { ref: "env://BILLING_OPS_KEY" }
+principals:
+  issuers:
+    - id: ci
+      kind: static-key
+      subject: build-agent
+      secret: { ref: "env://MCPIZER_CI_KEY" }
+      attributes:
+        role: automation
+grants:
+  - to:
+      issuer: ci
+      attributes: { role: automation }
+    capabilities: [billing.invoice.issue]
+    using: facturacion-ops
+    limits:
+      calls: 5
+      per: 1h
+`,
+    );
+    return policy;
+  }
+
+  it('genera el catálogo preguntándole al upstream, con su esquema de entrada', async () => {
+    const run = await mcpizer('catalog', conUpstreamReal());
+
+    expect(run.code).toBe(0);
+    expect(run.stdout).toContain('upstream: facturacion');
+    expect(run.stdout).toContain('name: create_invoice');
+    // Lo que el upstream declara viaja tal cual: reescribirlo aquí sería
+    // inventarse un contrato que nadie ha declarado.
+    expect(run.stdout).toContain('customerId');
+    // Y también la que ningún mapeo cubre: el catálogo describe lo que hay, no
+    // lo que la política concede.
+    expect(run.stdout).toContain('name: delete_invoice');
+  });
+
+  it('y lo generado sirve para verificar en seco, que es para lo que existe', async () => {
+    // El ida y vuelta completo: se genera con red una vez, se versiona, y a
+    // partir de ahí `validate` vuelve a funcionar sin ella (invariante 8).
+    const policy = conUpstreamReal();
+    const generado = await mcpizer('catalog', policy);
+
+    const catalogo = join(mkdtempSync(join(tmpdir(), 'mcpizer-catalogo-')), 'catalog.yaml');
+    writeFileSync(catalogo, generado.stdout);
+
+    const validado = await mcpizer('validate', policy, '--catalog', catalogo);
+    expect(validado.code).toBe(0);
+    // Una sola advertencia, y es la tool que existe y nadie mapea.
+    expect(validado.stdout).toContain('catalog_tool_unmapped');
+    expect(validado.stdout).toContain('delete_invoice');
+  });
+
+  it('un upstream que no responde aborta: un catálogo incompleto es una revocación silenciosa', async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'mcpizer-catalogo-'));
+    const policy = join(directory, 'policy.yaml');
+    writeFileSync(
+      policy,
+      `version: 1
+capabilities:
+  - id: billing.invoice.issue
+upstreams:
+  - id: facturacion
+    transport:
+      kind: mcp-stdio
+      command: este-binario-no-existe-en-ningun-sitio
+    tools:
+      - name: create_invoice
+        capability: billing.invoice.issue
+accounts: []
+principals:
+  issuers: []
+grants: []
+`,
+    );
+
+    const run = await mcpizer('catalog', policy);
+    expect(run.code).toBe(3);
+    expect(run.stdout).toBe('');
+  });
+});
+
+describe('version', () => {
+  it('dice qué build está corriendo, y sobre qué Node', async () => {
+    const run = await mcpizer('version');
+    expect(run.code).toBe(0);
+    expect(run.stdout).toMatch(/^mcpizer \d+\.\d+\.\d+/);
+    expect(run.stdout).toContain(process.version);
+  });
+
+  it('y en JSON cuando se le pide', async () => {
+    const run = await mcpizer('version', '--json');
+    expect(JSON.parse(run.stdout)).toMatchObject({ node: process.version });
+  });
+});

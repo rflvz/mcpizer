@@ -59,4 +59,8 @@ Las decisiones no se borran ni se editan cuando cambian: se registra una nueva q
 | [0033](0033-tls-fuera-cors-ninguno-techo-dentro.md) | TLS fuera, CORS ninguno, techo de petición dentro | Vigente |
 | [0034](0034-la-parada-ordenada-la-conecta-la-cascara.md) | La parada ordenada la conecta la cáscara; sin puerto de señales, salud ni configuración | Vigente |
 | [0035](0035-una-version-para-el-producto.md) | Una versión para el producto; los siete paquetes siguen privados | Vigente |
-| [0036](0036-lo-que-s4-no-cierra.md) | Lo que S4 no cierra, y por qué | Vigente |
+| [0036](0036-lo-que-s4-no-cierra.md) | Lo que S4 no cierra, y por qué | Sustituida en parte por 0039 y 0040 |
+| [0037](0037-la-identidad-de-certificado-la-verifica-el-terminador.md) | La identidad de certificado la verifica el terminador TLS, y llega por cabecera | Vigente |
+| [0038](0038-nada-sensible-por-canal-abierto.md) | Ni el artefacto ni el secreto de un cliente viajan por canal abierto | Vigente |
+| [0039](0039-el-generador-del-catalogo-declarado.md) | El generador del catálogo declarado, y por qué aborta en vez de completar | Vigente |
+| [0040](0040-se-escriben-las-implementaciones-previstas.md) | Se escriben las cinco implementaciones previstas que faltaban | Vigente |
