@@ -1,15 +1,30 @@
 {
   "name": "@mcpizer/access",
-  "version": "0.0.0",
-  "private": true,
+  "version": "0.1.0",
+  "description": "Contexto de mcpizer — la decisión: fallo cerrado, con motivo y con el sitio del artefacto que lo explica",
+  "homepage": "https://github.com/rflvz/mcpizer#readme",
+  "bugs": "https://github.com/rflvz/mcpizer/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rflvz/mcpizer.git",
+    "directory": "access"
+  },
   "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc -b"
   }

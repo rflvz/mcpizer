@@ -1,8 +1,21 @@
 {
   "name": "@mcpizer/adapters",
-  "version": "0.0.0",
-  "private": true,
+  "version": "0.1.0",
+  "description": "La periferia de mcpizer: las implementaciones de sus siete puertos",
+  "homepage": "https://github.com/rflvz/mcpizer#readme",
+  "bugs": "https://github.com/rflvz/mcpizer/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rflvz/mcpizer.git",
+    "directory": "adapters"
+  },
   "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",

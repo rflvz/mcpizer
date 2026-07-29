@@ -122,6 +122,14 @@ No es uno de los nueve criterios de la sección 5: es el criterio de terminació
 
 Los casos que lo hacen fallar están en [`entrega.md`](entrega.md) §4. Todo corre sin Docker, sin red y sin servicios; la imagen se construye aparte, en CI ([0032](../decisiones/0032-la-imagen-es-una-envoltura.md)).
 
+### 3.5.1 Y lo que se publica se instala
+
+> Lo que se publica se instala con `npm` y arranca, desde cero y sin red.
+
+El hermano del anterior, para el tercer camino de [`entrega.md`](entrega.md) §2.1. Se separa porque comprueba otra cosa: el artefacto se construye **desde** este repositorio, y lo publicado llega a quien lo instala **sin** él. Lo que el tarball no lleve, no existe.
+
+Se instala con el cliente de `npm` real contra un registro de fixture que habla su protocolo, cuyo espejo es el cierre que fijó el fichero de bloqueo; y el binario se ejecuta **por su nombre**, que es lo único que ejercita el shebang y el enlace que npm deja. Cuatro descuidos se rechazan antes de subir nada, y el quinto —una dependencia de producción sin declarar— solo aparece al instalar de verdad, que es la razón de instalar ([0043](../decisiones/0043-lo-instalado-se-comprueba-con-el-npm-real.md)).
+
 ### 3.6 Legibilidad estructural
 
 > La estructura de primer nivel se lee como el dominio, no como el framework.
@@ -154,6 +162,7 @@ Y el criterio de terminación de cada sesión, por el mismo mecanismo y con las 
 | S2 · ninguna credencial en registros ni en motivos | Centinelas irrepetibles y un escáner sobre todo lo observable |
 | S3 · dos implementaciones por puerto, intercambiables | Dos periferias completas, el mismo recorrido, decisiones idénticas |
 | S4 · el artefacto desplegable se construye y arranca desde cero | §3.5 |
+| El publicado · lo que se publica se instala y arranca | §3.5.1 |
 
 **Todas fallan el build.** Un criterio que solo avisa no es un criterio de aceptación.
 

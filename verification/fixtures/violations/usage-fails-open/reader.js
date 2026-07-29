@@ -26,7 +26,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { declaredCatalogFile, envCredentials, policyFile, redisUsage, staticKeyPrincipals, stderrRecorder } from '@mcpizer/adapters';
-import { gateway, loadPolicy } from '@mcpizer/runtime';
+import { gateway, loadPolicy } from 'mcpizer';
 
 const REPO = fileURLToPath(new URL('../../../..', import.meta.url));
 const UPSTREAM = join(REPO, 'verification', 'fixtures', 'upstream', 'server.js');

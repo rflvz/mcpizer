@@ -1,15 +1,30 @@
 {
   "name": "@mcpizer/policy",
-  "version": "0.0.0",
-  "private": true,
+  "version": "0.1.0",
+  "description": "Contexto de mcpizer — el artefacto declarativo: esquema, carga y punteros que resuelven a línea y columna",
+  "homepage": "https://github.com/rflvz/mcpizer#readme",
+  "bugs": "https://github.com/rflvz/mcpizer/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rflvz/mcpizer.git",
+    "directory": "policy"
+  },
   "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc -b"
   },

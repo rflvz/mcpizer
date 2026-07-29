@@ -17,7 +17,7 @@
  */
 import { envCredentials, memoryUsage, staticKeyPrincipals, stderrRecorder } from '@mcpizer/adapters';
 import { declaredCatalogFile, policyFile } from '@mcpizer/adapters';
-import { gateway, loadPolicy } from '@mcpizer/runtime';
+import { gateway, loadPolicy } from 'mcpizer';
 
 const [, , policyPath, catalogPath, issuerId, toolName] = process.argv;
 

@@ -1,15 +1,30 @@
 {
   "name": "@mcpizer/capabilities",
-  "version": "0.0.0",
-  "private": true,
+  "version": "0.1.0",
+  "description": "Contexto de mcpizer — qué puede hacerse: capacidades del dominio y el mapeo de tools que las realizan",
+  "homepage": "https://github.com/rflvz/mcpizer#readme",
+  "bugs": "https://github.com/rflvz/mcpizer/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rflvz/mcpizer.git",
+    "directory": "capabilities"
+  },
   "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc -b"
   }
