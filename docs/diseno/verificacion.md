@@ -128,7 +128,7 @@ Los casos que lo hacen fallar están en [`entrega.md`](entrega.md) §4. Todo cor
 
 El hermano del anterior, para el tercer camino de [`entrega.md`](entrega.md) §2.1. Se separa porque comprueba otra cosa: el artefacto se construye **desde** este repositorio, y lo publicado llega a quien lo instala **sin** él. Lo que el tarball no lleve, no existe.
 
-Se instala con el cliente de `npm` real contra un registro de fixture que habla su protocolo, cuyo espejo es el cierre que fijó el fichero de bloqueo; y el binario se ejecuta **por su nombre**, que es lo único que ejercita el shebang y el enlace que npm deja. Cuatro descuidos se rechazan antes de subir nada, y el quinto —una dependencia de producción sin declarar— solo aparece al instalar de verdad, que es la razón de instalar ([0043](../decisiones/0043-lo-instalado-se-comprueba-con-el-npm-real.md)).
+Se instala con el cliente de `npm` real contra un registro de fixture que habla su protocolo, cuyo espejo es el cierre que fijó el fichero de bloqueo; y el binario se ejecuta **por su nombre**, que es lo único que ejercita el shebang y el enlace que npm deja. Seis descuidos se rechazan antes de subir nada, y el que no —una dependencia de producción sin declarar— solo aparece al instalar de verdad, que es la razón de instalar ([0043](../decisiones/0043-lo-instalado-se-comprueba-con-el-npm-real.md)).
 
 ### 3.6 Legibilidad estructural
 
