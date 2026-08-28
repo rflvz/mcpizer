@@ -35,6 +35,7 @@ import { promisify } from 'node:util';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { publicables, PUBLICABLES } from '../../deployment/publish.js';
+import { extrae } from '../fixtures/registry/tarball.js';
 import { EJEMPLO, entorno, recorre, type RecorridoDeCliente } from '../lib/artifact.js';
 import {
   conNpx,
@@ -181,6 +182,8 @@ describe('publicar se niega antes de subir nada', () => {
     ['desalineado', /tienen que decir la misma versión/],
     ['sin-construir', /no está construido/],
     ['sin-shebang', /no empieza por shebang/],
+    ['sin-licencia', /no declara `license`/],
+    ['sin-fichero-de-licencia', /no lleva el fichero `LICENSE` al lado/],
   ] as const;
 
   it.each(DESCUIDOS)('se niega con un %s', async (descuido, esperado) => {
@@ -196,12 +199,13 @@ describe('publicar se niega antes de subir nada', () => {
     expect(problemas[0]).toMatch(esperado);
   });
 
-  it('y sobre este repositorio lo único que falta es elegir licencia', () => {
-    // La licencia no la elige el diseño ni esta comprobación: es del dueño
-    // (decisión 0042). Lo que sí puede afirmarse es que no falta **nada más**,
-    // de modo que el día que se elija, publicar sea un solo paso.
+  it('y sobre este repositorio no falta nada', () => {
+    // Esta afirmación tuvo una excepción hasta que el dueño eligió licencia
+    // (decisiones 0042 y 0044): entonces decía "no falta nada **más**". Ya no
+    // hace falta el matiz, y por eso se quita en vez de dejarse por si acaso:
+    // un filtro que no excluye nada es una excepción que nadie vuelve a mirar.
     const { problemas } = publicables(REPO_ROOT);
-    expect(problemas.filter((problema) => !problema.includes('`license`'))).toEqual([]);
+    expect(problemas).toEqual([]);
   });
 });
 
@@ -258,6 +262,18 @@ describe('el manifiesto publicado dice lo que hay que decir', () => {
 
     expect(dependencias).not.toHaveLength(0);
     expect(dependencias.every((rango) => rango === instalado.version)).toBe(true);
+  });
+
+  it('y el aviso de licencia viaja dentro de los siete tarballs', async () => {
+    // El campo `license` del manifiesto dice bajo qué términos se cede; MIT pide
+    // además que el aviso se incluya en las copias, y la copia que recibe quien
+    // instala es el tarball. Que npm meta `LICENSE` aunque `files` solo nombre
+    // `dist` es comportamiento suyo, no nuestro: se comprueba sobre lo que
+    // `pnpm pack` produjo de verdad, en vez de confiarse.
+    for (const { manifiesto, produce } of await propios()) {
+      expect(manifiesto['license']).toBe('MIT');
+      expect(extrae(produce(), 'package/LICENSE').toString('utf8')).toContain('MIT License');
+    }
   });
 
   it('y el taller no se publica', async () => {

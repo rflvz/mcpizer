@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Los cuatro casos que hacen fallar "los siete se pueden publicar".
+ * Los seis casos que hacen fallar "los siete se pueden publicar".
  *
  *   node mutila.js <destino> <descuido>
  *
@@ -14,9 +14,11 @@
  * | `desalineado` | `mcpizer` pide sus contextos por versión exacta; publicar uno a otra versión deja algo que no se resuelve |
  * | `sin-construir` | `files: ["dist"]` sobre un `dist/` que no existe sube un paquete que se instala sin error y está vacío |
  * | `sin-shebang` | el binario se instala igual, y lo ejecuta el intérprete que el sistema decida |
+ * | `sin-licencia` | queda publicado un paquete que nadie tiene permiso para usar, y esa versión no se corrige |
+ * | `sin-fichero-de-licencia` | el manifiesto dice MIT y el tarball no lleva el aviso que MIT obliga a incluir |
  *
  * Se genera en vez de vivir escrito porque son siete manifiestos por caso, y
- * cuatro copias congeladas del árbol real envejecerían por separado: el día que
+ * seis copias congeladas del árbol real envejecerían por separado: el día que
  * un paquete octavo entrara en `PUBLICABLES`, los fixtures seguirían diciendo
  * que hay siete y pasarían por la razón equivocada.
  */
@@ -43,6 +45,18 @@ const DESCUIDOS = {
     const bin = join(destino, 'runtime', 'dist', 'cli', 'main.js');
     writeFileSync(bin, readFileSync(bin, 'utf8').replace(/^#![^\n]*\n/, ''));
   },
+  // Mientras el repositorio no tenía licencia, este caso lo ejercitaba el
+  // propio árbol real: la comprobación fallaba sola. Elegida ya (decisión
+  // 0044), la negativa se quedaría sin nadie que la hiciera fallar, y una
+  // comprobación que nunca ha fallado no está verificada (`docs/sesiones.md` §2).
+  'sin-licencia': (manifiestos) => {
+    delete manifiestos['adapters'].license;
+  },
+  'sin-fichero-de-licencia': (_manifiestos, destino) => {
+    // El manifiesto sigue diciendo MIT: lo que falta es el texto que MIT obliga
+    // a incluir en las copias, y una copia es justo lo que recibe quien instala.
+    rmSync(join(destino, 'policy', 'LICENSE'));
+  },
 };
 
 const [, , destino, descuido] = process.argv;
@@ -66,7 +80,10 @@ writeFileSync(join(destino, 'runtime', 'dist', 'cli', 'main.js'), '#!/usr/bin/en
 
 // El árbol copiado está sano: sin esto, los casos pasarían por lo que les falta
 // al fixture y no por el descuido que traen.
-for (const dir of PUBLICABLES) manifiestos[dir].license = 'MIT';
+for (const dir of PUBLICABLES) {
+  manifiestos[dir].license = 'MIT';
+  writeFileSync(join(destino, dir, 'LICENSE'), 'MIT License\n');
+}
 
 DESCUIDOS[descuido](manifiestos, destino);
 

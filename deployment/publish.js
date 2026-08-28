@@ -15,7 +15,7 @@
  * el punto exacto donde un publicador casero rompería el producto sin avisar.
  *
  * Lo que este guion aporta no es subir ficheros: es **negarse a subirlos** en
- * los cuatro casos en que lo publicado quedaría roto y el registro no lo diría.
+ * los seis casos en que lo publicado quedaría roto y el registro no lo diría.
  */
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
@@ -102,16 +102,27 @@ export function publicables(root = REPO_ROOT) {
       );
     }
 
-    // 4. La licencia.
+    // 4. La licencia: declarada, y dentro del paquete.
     //
-    // No es una decisión de diseño ni de esta sesión: es del dueño del
-    // repositorio (decisión 0042). Publicar sin ella deja un paquete que nadie
-    // puede usar legalmente y que npm marca como propietario para siempre en esa
-    // versión, así que se bloquea aquí en vez de avisarse.
+    // No fue una decisión de diseño sino del dueño del repositorio (decisión
+    // 0042), y es MIT (decisión 0044). Publicar sin ella deja un paquete que
+    // nadie puede usar legalmente y que npm marca como propietario para siempre
+    // en esa versión, así que se bloquea aquí en vez de avisarse.
+    //
+    // Y el campo del manifiesto no basta: MIT pide que el aviso viaje en las
+    // copias, y quien instala solo recibe el tarball. npm mete el fichero
+    // `LICENSE` aunque `files` no lo nombre —por eso los siete lo tienen al lado
+    // del manifiesto en vez de solo en la raíz—, pero eso lo garantiza mientras
+    // el fichero exista, que es lo que se mira aquí.
     if (typeof manifest.license !== 'string' || manifest.license === '') {
       problemas.push(
         `${dir}: no declara \`license\`. Elegir licencia es del dueño del repositorio, ` +
           'y una versión publicada sin ella no se corrige: se sucede.',
+      );
+    } else if (!existsSync(join(root, dir, 'LICENSE'))) {
+      problemas.push(
+        `${dir}: declara \`license\` y no lleva el fichero \`LICENSE\` al lado. ` +
+          'El texto viaja en el tarball, que es la copia que recibe quien instala.',
       );
     }
   }

@@ -2,6 +2,7 @@
   "name": "@mcpizer/principals",
   "version": "0.1.0",
   "description": "Contexto de mcpizer — quién invoca: normaliza identidades de procedencias distintas a un principal con atributos",
+  "license": "MIT",
   "homepage": "https://github.com/rflvz/mcpizer#readme",
   "bugs": "https://github.com/rflvz/mcpizer/issues",
   "repository": {

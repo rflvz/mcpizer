@@ -2,6 +2,7 @@
   "name": "@mcpizer/accounts",
   "version": "0.1.0",
   "description": "Contexto de mcpizer — contra qué cuenta se ejecuta: referencias de cuenta opacas, nunca material canjeable",
+  "license": "MIT",
   "homepage": "https://github.com/rflvz/mcpizer#readme",
   "bugs": "https://github.com/rflvz/mcpizer/issues",
   "repository": {
