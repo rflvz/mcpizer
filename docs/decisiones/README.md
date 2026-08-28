@@ -65,5 +65,6 @@ Las decisiones no se borran ni se editan cuando cambian: se registra una nueva q
 | [0039](0039-el-generador-del-catalogo-declarado.md) | El generador del catálogo declarado, y por qué aborta en vez de completar | Vigente |
 | [0040](0040-se-escriben-las-implementaciones-previstas.md) | Se escriben las cinco implementaciones previstas que faltaban | Vigente |
 | [0041](0041-se-publican-los-siete-y-el-producto-se-llama-mcpizer.md) | Se publican los siete, con una sola versión, y el que trae la CLI se llama `mcpizer` | Vigente |
-| [0042](0042-la-licencia-la-elige-el-dueno.md) | Publicar exige una licencia, y elegirla no es una decisión de diseño | Vigente |
+| [0042](0042-la-licencia-la-elige-el-dueno.md) | Publicar exige una licencia, y elegirla no es una decisión de diseño | Cerrada por 0044 |
 | [0043](0043-lo-instalado-se-comprueba-con-el-npm-real.md) | Lo publicado se comprueba instalándolo con el `npm` real | Vigente |
+| [0044](0044-la-licencia-es-mit.md) | La licencia es MIT, y el aviso viaja dentro de cada paquete | Vigente |

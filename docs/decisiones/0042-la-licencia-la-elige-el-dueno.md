@@ -1,6 +1,6 @@
 # 0042 — Publicar exige una licencia, y elegirla no es una decisión de diseño
 
-**Estado**: Vigente
+**Estado**: Vigente en su regla —publicar sigue exigiendo licencia—. La elección que dejaba abierta la cerró el dueño en [0044](0044-la-licencia-es-mit.md): MIT.
 
 ## Contexto
 
@@ -26,12 +26,12 @@ Y hay una razón práctica que apunta al mismo sitio: elegir mal aquí es peor q
 
 ## Consecuencias
 
-- `node deployment/publish.js` en este repositorio, hoy, imprime siete negativas idénticas y sale con 1. Es el estado correcto: dice exactamente qué falta.
-- La comprobación de instalación afirma que **lo único** que falta es la licencia — `problemas` sin las de `license` tiene que estar vacío—. Así el día que se elija, publicar es un solo paso, y hasta entonces nada más se pudre sin que nadie mire.
+- `node deployment/publish.js` en este repositorio imprimió siete negativas idénticas hasta [0044](0044-la-licencia-es-mit.md), y salía con 1. Era el estado correcto: decía exactamente qué faltaba.
+- La comprobación de instalación afirmaba que **lo único** que faltaba era la licencia — `problemas` sin las de `license` tenía que estar vacío—, para que el día que se eligiera publicar fuera un solo paso. Lo fue: 0044 quitó el filtro y la afirmación pasó a ser que no falta nada.
 - Añadir la licencia es tocar los siete manifiestos y dejar el fichero en la raíz. La comprobación de alineación de versiones ya obliga a tocarlos juntos.
 
 ## Alternativas descartadas
 
-- **Elegir MIT y seguir.** Es lo que haría casi todo el mundo, y probablemente lo que se acabe eligiendo. Sigue sin ser de quien escribe el código: es del dueño del repositorio, y una elección irreversible tomada por comodidad es exactamente el tipo de decisión que este registro existe para no tomar en silencio.
+- **Elegir MIT y seguir.** Es lo que haría casi todo el mundo, y es lo que el dueño acabó eligiendo — preguntado, que es la diferencia que esta decisión defiende. Sigue sin ser de quien escribe el código: es del dueño del repositorio, y una elección irreversible tomada por comodidad es exactamente el tipo de decisión que este registro existe para no tomar en silencio.
 - **Publicar sin `license` y añadirla en la siguiente versión.** Deja una versión publicada que nadie puede usar legalmente, para siempre, y con el aspecto de estar disponible.
 - **Avisar en vez de bloquear.** Un aviso en un guion es una nota adhesiva en la pantalla de otro.

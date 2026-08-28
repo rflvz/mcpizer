@@ -31,10 +31,10 @@ Para empaquetarlos dentro habría que pasar el workspace entero a un `node_modul
 
 ## Consecuencias
 
-- `pnpm publish -r` publica los siete. `deployment/publish.js` lo envuelve, **en seco por defecto** como el producto ([0014](0014-uso-por-defecto-en-seco.md)), y se niega en los cuatro casos en que publicar sale mal sin que el registro se queje.
+- `pnpm publish -r` publica los siete. `deployment/publish.js` lo envuelve, **en seco por defecto** como el producto ([0014](0014-uso-por-defecto-en-seco.md)), y se niega en los casos en que publicar sale mal sin que el registro se queje.
 - Subir de versión pasa de tocar dos manifiestos a tocar ocho. Lo atrapan dos comprobaciones distintas: el empaquetado se niega si la raíz y el artefacto no coinciden, y el publicado se niega si los siete no dicen lo mismo.
 - `npx mcpizer` funciona, y es el camino que el README ofrece primero.
-- Nadie ha publicado todavía: no hay registro donde dejarlo y falta elegir licencia ([0042](0042-la-licencia-la-elige-el-dueno.md)). Lo que sí está comprobado es que lo que se publicaría se instala y arranca ([0043](0043-lo-instalado-se-comprueba-con-el-npm-real.md)).
+- Nadie ha publicado todavía, y ya no es porque falte nada: la licencia que quedaba pendiente ([0042](0042-la-licencia-la-elige-el-dueno.md)) la eligió el dueño ([0044](0044-la-licencia-es-mit.md)). Lo que está comprobado es que lo que se publicaría se instala y arranca ([0043](0043-lo-instalado-se-comprueba-con-el-npm-real.md)); lo que queda es dar el paso irreversible.
 - Si algún día los seis contextos estorban en el registro, el camino de vuelta existe y está descrito arriba: `bundledDependencies` con un `node_modules` aplanado, pagando lo que cuesta.
 
 ## Alternativas descartadas

@@ -8,7 +8,7 @@ Las dos identidades nunca son la misma cosa. **Quién invoca** es el principal: 
 
 ## Estado
 
-**Las cuatro sesiones, completadas**, y el producto se instala. Hay un artefacto desplegable que se construye y arranca desde cero sin este repositorio y sin red; y los siete paquetes se publican, con la comprobación de que lo publicado se instala con el `npm` de verdad y arranca fuera de aquí. Lo único que falta para subirlo es elegir licencia ([decisión 0042](docs/decisiones/0042-la-licencia-la-elige-el-dueno.md)).
+**Las cuatro sesiones, completadas**, y el producto se instala. Hay un artefacto desplegable que se construye y arranca desde cero sin este repositorio y sin red; y los siete paquetes se publican, con la comprobación de que lo publicado se instala con el `npm` de verdad y arranca fuera de aquí. Está bajo licencia **MIT** ([decisión 0044](docs/decisiones/0044-la-licencia-es-mit.md)), y `deployment/publish.js` ya no tiene nada que objetar: lo que queda es el paso irreversible de subirlo, que es del dueño.
 
 Y la periferia está completa: cada puerto tiene entre **dos y cuatro** implementaciones, intercambiables sin tocar el núcleo ni la orquestación, y ninguna de las que el diseño preveía sigue sin escribir.
 
@@ -47,7 +47,7 @@ pnpm install
 pnpm verify          # build · tipos · linter · dependencias · superficie · tests
 ```
 
-> Los paquetes **todavía no están publicados**: falta elegir licencia, que es del dueño del repositorio y no del diseño ([decisión 0042](docs/decisiones/0042-la-licencia-la-elige-el-dueno.md)). Lo que sí está comprobado, en cada `pnpm verify`, es que lo que se publicaría se instala con el `npm` de verdad y arranca fuera de aquí.
+> Los paquetes **todavía no están en el registro**: ya no falta nada para subirlos —la licencia, que era lo último, es MIT ([decisión 0044](docs/decisiones/0044-la-licencia-es-mit.md))—, y publicar es irreversible, así que lo da el dueño y no una sesión. Lo que sí está comprobado, en cada `pnpm verify`, es que lo que se publicaría se instala con el `npm` de verdad y arranca fuera de aquí.
 
 Sobre el ejemplo de [`docs/diseno/artefacto.md`](docs/diseno/artefacto.md) §2, que vive en [`examples/`](examples/):
 
@@ -131,7 +131,7 @@ node deployment/publish.js            # en seco, como el producto: dice qué sub
 node deployment/publish.js --publish
 ```
 
-Se niega antes de subir nada ante un `private` olvidado, versiones desalineadas, un paquete sin construir, un binario sin shebang o una licencia que falta. El descuido que ningún manifiesto delata —una dependencia de producción sin declarar— lo encuentra la instalación: se instala sin una queja y no arranca.
+Se niega antes de subir nada ante un `private` olvidado, versiones desalineadas, un paquete sin construir, un binario sin shebang, una licencia sin declarar o declarada sin que el texto viaje en el paquete. El descuido que ningún manifiesto delata —una dependencia de producción sin declarar— lo encuentra la instalación: se instala sin una queja y no arranca.
 
 ### Desplegarla
 
@@ -231,3 +231,7 @@ Y la del **publicado** cierra el hueco que ninguna de las otras ve: el artefacto
 TypeScript sobre el SDK oficial de MCP. La elección condiciona nombres y herramientas de verificación, no la estructura — ver [`docs/decisiones/0001-lenguaje-y-base-mcp.md`](docs/decisiones/0001-lenguaje-y-base-mcp.md).
 
 **Para desarrollarlo** hacen falta Node 22 o superior y pnpm. **Para ejecutarlo**, solo Node 22: el artefacto desplegable lleva dentro todo lo demás.
+
+## Licencia
+
+[MIT](LICENSE). Los siete paquetes publicados llevan el aviso dentro, no solo este repositorio: lo que recibe quien instala es un tarball, y lo que el tarball no lleve no existe para él ([decisión 0044](docs/decisiones/0044-la-licencia-es-mit.md)).

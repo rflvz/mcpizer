@@ -2,6 +2,7 @@
   "name": "mcpizer",
   "version": "0.1.0",
   "description": "Pasarela MCP con autorización: dado quién invoca y qué intenta hacer, qué tools ve, contra qué cuenta se ejecuta y bajo qué límites",
+  "license": "MIT",
   "keywords": ["mcp", "model-context-protocol", "authorization", "gateway", "policy"],
   "homepage": "https://github.com/rflvz/mcpizer#readme",
   "bugs": "https://github.com/rflvz/mcpizer/issues",

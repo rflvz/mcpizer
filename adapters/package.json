@@ -2,6 +2,7 @@
   "name": "@mcpizer/adapters",
   "version": "0.1.0",
   "description": "La periferia de mcpizer: las implementaciones de sus siete puertos",
+  "license": "MIT",
   "homepage": "https://github.com/rflvz/mcpizer#readme",
   "bugs": "https://github.com/rflvz/mcpizer/issues",
   "repository": {

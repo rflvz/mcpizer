@@ -2,6 +2,7 @@
   "name": "@mcpizer/access",
   "version": "0.1.0",
   "description": "Contexto de mcpizer — la decisión: fallo cerrado, con motivo y con el sitio del artefacto que lo explica",
+  "license": "MIT",
   "homepage": "https://github.com/rflvz/mcpizer#readme",
   "bugs": "https://github.com/rflvz/mcpizer/issues",
   "repository": {

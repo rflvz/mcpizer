@@ -2,6 +2,7 @@
   "name": "@mcpizer/policy",
   "version": "0.1.0",
   "description": "Contexto de mcpizer — el artefacto declarativo: esquema, carga y punteros que resuelven a línea y columna",
+  "license": "MIT",
   "homepage": "https://github.com/rflvz/mcpizer#readme",
   "bugs": "https://github.com/rflvz/mcpizer/issues",
   "repository": {
